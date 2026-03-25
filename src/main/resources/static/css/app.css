@@ -58,6 +58,7 @@ body::before {
 .side {
   position: sticky;
   top: 24px;
+  z-index: 5;
   height: fit-content;
   background: var(--card);
   border: 1px solid var(--line);
@@ -81,8 +82,8 @@ body::before {
 .side nav {
   position: relative;
   padding-left: 18px;
-  max-height: calc(100vh - 260px);
-  overflow: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 

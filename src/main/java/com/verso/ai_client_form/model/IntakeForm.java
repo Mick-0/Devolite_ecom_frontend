@@ -59,7 +59,6 @@ public class IntakeForm {
     private String crmListName;
     private String crmCompanyNameSnapshot;
     private String crmSector;
-    private String crmVatNumber;
     private String crmNotes;
     private String crmInterestTemperature;
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
@@ -72,7 +71,6 @@ public class IntakeForm {
 
     @Pattern(regexp = "^(?:consulente_cliente|integrazione_iubenda|da_definire)?$", message = "Seleziona una modalita legale valida.")
     private String legalSupportMode;
-    private String legalVatNumber;
     private String legalReaNumber;
     private BigDecimal legalShareCapital;
     private String legalPecEmail;

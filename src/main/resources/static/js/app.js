@@ -486,9 +486,7 @@
     const height = Math.max(12, linkRect.height - 12);
     indicator.style.top = `${top}px`;
     indicator.style.height = `${height}px`;
-    if (window.matchMedia('(min-width: 1100px)').matches) {
-      link.scrollIntoView({ block: 'nearest' });
-    }
+    // left summary scrolls with the page; no internal centering
   };
 
   const setActive = (id) => {

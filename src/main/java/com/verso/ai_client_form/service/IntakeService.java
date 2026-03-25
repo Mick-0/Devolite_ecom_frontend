@@ -106,7 +106,7 @@ public class IntakeService {
             "list_name", form.getCrmListName(),
             "company_name_snapshot", form.getCrmCompanyNameSnapshot(),
             "sector", form.getCrmSector(),
-            "vat_number", form.getCrmVatNumber(),
+            "vat_number", form.getVatNumber(),
             "notes", form.getCrmNotes(),
             "interest_temperature", form.getCrmInterestTemperature(),
             "first_call_date", form.getCrmFirstCallDate(),
@@ -117,7 +117,7 @@ public class IntakeService {
 
         repo.upsertLegalProfile(projectId, map(
             "legal_support_mode", form.getLegalSupportMode(),
-            "vat_number", form.getLegalVatNumber(),
+            "vat_number", form.getVatNumber(),
             "rea_number", form.getLegalReaNumber(),
             "share_capital", form.getLegalShareCapital(),
             "pec_email", form.getLegalPecEmail(),
@@ -343,7 +343,10 @@ public class IntakeService {
                 form.setCrmListName((String) row.get("list_name"));
                 form.setCrmCompanyNameSnapshot((String) row.get("company_name_snapshot"));
                 form.setCrmSector((String) row.get("sector"));
-                form.setCrmVatNumber((String) row.get("vat_number"));
+                String crmVat = (String) row.get("vat_number");
+                if ((form.getVatNumber() == null || form.getVatNumber().isBlank()) && crmVat != null && !crmVat.isBlank()) {
+                    form.setVatNumber(crmVat);
+                }
                 form.setCrmNotes((String) row.get("notes"));
                 form.setCrmInterestTemperature((String) row.get("interest_temperature"));
                 form.setCrmFirstCallDate(toLocalDate(row.get("first_call_date")));
@@ -355,7 +358,10 @@ public class IntakeService {
 
         repo.findLegalProfile(projectId).ifPresent(row -> {
             form.setLegalSupportMode((String) row.get("legal_support_mode"));
-            form.setLegalVatNumber((String) row.get("vat_number"));
+            String legalVat = (String) row.get("vat_number");
+            if ((form.getVatNumber() == null || form.getVatNumber().isBlank()) && legalVat != null && !legalVat.isBlank()) {
+                form.setVatNumber(legalVat);
+            }
             form.setLegalReaNumber((String) row.get("rea_number"));
             form.setLegalShareCapital((java.math.BigDecimal) row.get("share_capital"));
             form.setLegalPecEmail((String) row.get("pec_email"));
