@@ -1,0 +1,29 @@
+﻿<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Devolite | Errore</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="/favicon_io/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon_io/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon_io/favicon-16x16.png" />
+  <link rel="icon" href="/favicon_io/favicon.ico" sizes="any" />
+  <link rel="manifest" href="/favicon_io/site.webmanifest" />
+
+<link rel="stylesheet" th:href="@{/css/app.css}" />
+</head>
+<body>
+  <div class="app" style="grid-template-columns: 1fr; max-width: 720px;">
+    <div class="card">
+      <h2 style="margin-top:0">Something went wrong</h2>
+      <p class="note">Status <span th:text="${status}">500</span></p>
+      <p class="note" th:if="${message}" th:text="${message}">Unexpected error.</p>
+      <div class="actions" style="margin-top:16px;">
+        <a class="primary" href="/intake">Back to intake</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+
+

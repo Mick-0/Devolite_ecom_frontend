@@ -1,0 +1,749 @@
+START.SQL - DOCUMENTAZIONE STRUTTURATA
+
+Questa documentazione segue lo stesso ordine di esecuzione di start.sql.
+Obiettivo: spiegare in modo operativo cosa fa ogni parte e a cosa serve.
+
+====================================================================
+1) BLOCCO INIZIALE
+====================================================================
+
+1.1 BEGIN;
+- Avvia una transazione unica.
+- Serve per applicare tutte le creazioni in modo atomico.
+- Se qualcosa fallisce, il database torna allo stato precedente.
+
+1.2 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+- Abilita funzioni crittografiche, in particolare gen_random_uuid().
+- Serve per generare UUID come chiavi primarie in tutte le tabelle.
+
+1.3 CREATE SCHEMA IF NOT EXISTS ...
+- Crea i silos logici del database:
+  core, media, anagrafica, crm, onboarding, legale, brand, marketing, sito,
+  dominio, local_business, commerciale, ai_ops, integrazioni, ecommerce.
+- Serve per separare responsabilita e rendere il modello scalabile.
+
+====================================================================
+2) SCHEMA core
+====================================================================
+
+2.1 core.client_company
+Scopo:
+- Anagrafica principale azienda cliente.
+
+Campi chiave:
+- id: PK UUID.
+- legal_name: ragione sociale.
+- industry: settore.
+- vat_number: partita IVA (se disponibile).
+- created_at / updated_at: audit tecnico.
+
+Vincoli e indici:
+- indice unico su vat_number (solo se non null), evita doppioni azienda.
+
+2.2 core.web_project
+Scopo:
+- Rappresenta il progetto web associato a una azienda.
+- Supporta sia progetto vetrina sia ecommerce.
+
+Campi chiave:
+- company_id: FK verso client_company.
+- project_name: nome interno progetto.
+- project_kind: vetrina o ecommerce.
+- expected_outcome: aspettative cliente.
+- source_channel: come e arrivato il contatto.
+- status: stato alto livello del progetto.
+
+Vincoli e indici:
+- check su project_kind e status.
+- indice su company_id e status per ricerche frequenti.
+
+2.3 core.staff_user
+Scopo:
+- Utenti interni che lavorano sul progetto (sales, PM, amministrazione, AI).
+
+Campi chiave:
+- email unica.
+- phone opzionale.
+- role con valori controllati.
+- is_active per disattivazione logica.
+
+2.4 core.project_assignment
+Scopo:
+- Assegnazione utenti interni ai progetti.
+
+Campi chiave:
+- project_id + staff_user_id + assignment_role = PK composita.
+- assignment_role puo differire dal ruolo anagrafico utente.
+
+Perche serve:
+- Gestisce ownership reale per step e attivita.
+
+====================================================================
+3) SCHEMA media
+====================================================================
+
+3.1 media.asset
+Scopo:
+- Registro unico file caricati/generati:
+  logo, visure, pdf contratto, csv prodotti, immagini, ecc.
+
+Campi chiave:
+- project_id: ogni asset appartiene a un progetto.
+- asset_category: tipologia file.
+- storage_path: dove e salvato fisicamente/oggetto.
+- generated_by_ai: distingue umano vs AI.
+- comment: note operative sul file (es. attenzione, revisione richiesta, istruzioni).
+- uploaded_by_user_id: tracciamento autore interno.
+
+Vincoli e indici:
+- check su categorie consentite.
+- indici su project_id e category.
+
+====================================================================
+4) SCHEMA anagrafica
+====================================================================
+
+4.1 anagrafica.company_profile
+Scopo:
+- Profilo aziendale esteso (indirizzo e dati business).
+
+Campi chiave:
+- company_id: 1:1 con core.client_company.
+- street/city/province/postal_code/country_code.
+- category, founder_years, annual_revenue, referral_source.
+
+Vincoli:
+- founder_years >= 0.
+- annual_revenue >= 0.
+
+4.2 anagrafica.company_contact
+Scopo:
+- Persone di contatto dell azienda cliente.
+
+Campi chiave:
+- full_name, phone, phone_secondary, email, email_secondary, role_title.
+- is_primary: contatto principale.
+- notes: note operative.
+
+Vincoli e indici:
+- indice su company_id.
+- unique parziale per permettere un solo contatto primario per azienda.
+
+====================================================================
+5) SCHEMA crm
+====================================================================
+
+5.1 crm.crm_contact
+Scopo:
+- E la scheda CRM principale della singola azienda cliente.
+- Tiene lo stato corrente della pipeline e i dati commerciali del referente.
+- Nel tuo modello e unica per azienda: non esistono duplicati di referente in pipeline.
+
+Relazioni:
+- company_id -> core.client_company(id), obbligatorio.
+
+Dettaglio campi:
+- id: identificatore tecnico UUID del record CRM.
+- company_id: collega la scheda CRM all azienda cliente.
+- first_name: nome referente commerciale.
+- last_name: cognome referente commerciale.
+- phone: telefono principale del referente.
+- email: email principale del referente.
+- email_secondary: email secondaria di backup.
+- list_name: lista sorgente da cui e arrivato il contatto.
+- company_name_snapshot: nome azienda "fotografato" all import.
+- sector: settore aziendale al momento acquisizione.
+- vat_number: partita IVA snapshot da lista/import.
+- notes: note operative libere (es. richieste, obiezioni, priorita).
+- interest_temperature: livello interesse percepito (es. caldo/tiepido/freddo).
+- first_call_date: data primo contatto telefonico.
+- second_call_date: data secondo follow-up.
+- cta: prossima azione commerciale concordata.
+- current_stage: stato attuale pipeline (lead/prospect/cliente).
+- created_at: data creazione scheda CRM.
+- updated_at: data ultimo aggiornamento scheda CRM.
+
+Regole e vincoli:
+- UNIQUE(company_id): una sola scheda pipeline per ogni azienda.
+- CHECK current_stage: accetta solo lead, prospect, cliente.
+- indice su current_stage: utile per vista kanban e filtri pipeline.
+
+5.2 crm.pipeline_event
+Scopo:
+- Tiene lo storico dei passaggi di stato della pipeline.
+- Non sostituisce current_stage: lo completa con la cronologia.
+
+Campi chiave:
+- id: identificatore evento.
+- contact_id: riferimento alla scheda crm_contact.
+- from_stage: stato precedente (puo essere null al primo inserimento).
+- to_stage: nuovo stato impostato.
+- changed_by_user_id: utente interno che ha eseguito il cambio.
+- note: motivazione o dettaglio operativo del cambio.
+- changed_at: timestamp dell evento.
+
+Perche serve:
+- Audit completo del funnel.
+- Reporting conversioni (lead -> prospect -> cliente).
+- Analisi tempi medi tra una fase e l altra.
+
+5.3 crm.contact_list
+Scopo:
+- Rappresenta una lista importata (campagna, evento, file esterno).
+
+Campi chiave:
+- id: identificatore lista.
+- list_name: nome logico lista.
+- source_file_name: nome file sorgente.
+- created_by_user_id: utente interno che ha caricato la lista.
+- created_at: data creazione record lista.
+- imported_at: data completamento import.
+
+5.4 crm.contact_list_member
+Scopo:
+- Associa i contatti CRM alle liste di provenienza.
+- Permette di sapere da quali liste e passato ogni contatto.
+
+Campi chiave:
+- PK (list_id, contact_id).
+
+====================================================================
+6) SCHEMA onboarding
+====================================================================
+
+6.1 onboarding.step_catalog
+Scopo:
+- Catalogo ufficiale step del flusso operativo.
+- Include step comuni e step specifici per vetrina/ecommerce.
+
+Dettaglio campi:
+- step_code: codice tecnico stabile dello step (es. usato da backend e frontend).
+- title: nome leggibile mostrabile in interfaccia.
+- sequence_no: posizione dello step nel flusso.
+- applicable_to: indica se lo step vale per vetrina, ecommerce o entrambi.
+- owner_role: ruolo interno che ha ownership dello step (sales, PM, AI, admin).
+
+6.2 INSERT step catalog
+Scopo:
+- Precarica gli step reali del processo:
+  aspetti legali, logo/colori, marketing, brainstorming, dominio,
+  google my business, contratto, amministrazione, AI, preview grafiche/testi,
+  footer, tool connessi, SEO AI, pagamenti/corrieri/categorie (ecommerce),
+  API tool.
+
+Note:
+- ON CONFLICT(step_code) DO NOTHING rende idempotente il preload.
+
+6.3 onboarding.project_step
+Scopo:
+- Stato di avanzamento di uno step dentro un progetto.
+
+Dettaglio campi:
+- id: identificatore del record avanzamento step.
+- project_id: progetto su cui si sta lavorando.
+- step_code: step specifico tratto dal catalogo.
+- status: stato operativo corrente (todo, in_progress, done, blocked).
+- owner_user_id: persona interna assegnata a quello step nel progetto.
+- started_at: quando lo step e stato avviato.
+- completed_at: quando lo step e stato concluso.
+- note: blocchi, dipendenze o dettagli operativi.
+
+Vincoli:
+- completed_at non puo precedere started_at.
+- UNIQUE(project_id, step_code): impedisce duplicazioni dello stesso step nel progetto.
+
+6.4 onboarding.question_answer
+Scopo:
+- Archivia risposte del cliente/operatore per ogni domanda del form.
+
+Dettaglio campi:
+- id: identificatore risposta.
+- project_id: progetto a cui appartiene la risposta.
+- step_code: step del flusso in cui la domanda e stata fatta.
+- question_code: codice tecnico domanda (stabile, utile per API e versioning form).
+- question_label: testo leggibile domanda (snapshot storico del label).
+- answer_text: risposta testuale libera.
+- answer_bool: risposta si/no.
+- answer_json: risposta strutturata (array/opzioni multiple/config).
+- answered_by_contact_id: referente cliente che ha risposto.
+- answered_by_user_id: operatore interno che ha inserito o validato la risposta.
+- answered_at: timestamp di registrazione risposta.
+
+Vincoli:
+- almeno un tipo risposta deve essere valorizzato.
+- unico per (project_id, step_code, question_code).
+
+====================================================================
+7) SCHEMA legale
+====================================================================
+
+7.1 legale.legal_profile
+Scopo:
+- Dati legali da mostrare e configurare (footer/privacy/termini).
+
+Dettaglio campi:
+- project_id: relazione 1:1 col progetto.
+- legal_support_mode: gestisce chi segue compliance legale (cliente o servizio integrato).
+- vat_number: partita IVA da esporre nei riferimenti legali.
+- rea_number: numero REA, utile per obblighi informativi societari.
+- share_capital: capitale sociale, dove richiesto.
+- pec_email: PEC ufficiale da esporre in footer/contatti legali.
+- privacy_page_completed: flag che indica privacy pronta e verificata.
+- terms_conditions_completed: flag che indica termini e condizioni pronti.
+- footer_cta: testo CTA legale/commerciale da inserire nel footer.
+- updated_at: ultimo aggiornamento dati legali.
+
+7.2 legale.legal_document
+Scopo:
+- Documenti legali caricati (visura, privacy policy, termini).
+
+Dettaglio campi:
+- id: identificatore documento.
+- project_id: progetto proprietario del documento.
+- document_type: tipologia documento (visura, privacy, termini, altro).
+- asset_id: collegamento al file fisico in media.asset.
+- notes: annotazioni di controllo (versione, manca firma, da aggiornare, ecc.).
+- uploaded_at: data caricamento/registrazione.
+
+====================================================================
+8) SCHEMA brand
+====================================================================
+
+8.1 brand.identity_profile
+Scopo:
+- Identita visiva del progetto.
+
+Dettaglio campi:
+- project_id: relazione 1:1 con progetto.
+- logo_asset_id: file logo attuale collegato da media.asset.
+- logo_restyle_required: indica se il cliente richiede restyling logo.
+- logo_restyle_generated: indica se proposta restyling e stata prodotta.
+- logo_approved: indica se il logo finale e stato approvato.
+- primary_color: colore brand principale.
+- secondary_color: colore secondario.
+- accent_color_1: colore accessorio per componenti UI.
+- accent_color_2: secondo colore accessorio.
+- font_policy: usa font aziendali o font da selezionare.
+- visual_asset_source: provenienza immagini (cliente, stock, misto).
+- tone_of_voice: tono comunicativo richiesto (formale, tecnico, ecc.).
+- updated_at: ultimo aggiornamento profilo brand.
+
+Vincoli:
+- validazione formato colore HEX (#RGB o #RRGGBB).
+
+8.2 brand.graphic_asset
+Scopo:
+- Associazione asset grafici attivi per aree del sito (banner/footer/pagina/prodotto).
+
+Dettaglio campi:
+- id: identificatore riga associazione.
+- project_id: progetto di appartenenza.
+- asset_id: asset grafico collegato.
+- asset_scope: zona d uso (preview banner, footer, pagina, prodotto, altro).
+- is_active: consente attivazione/disattivazione rapida asset.
+- sort_order: ordine visualizzazione.
+- created_at: data creazione associazione.
+
+Vincoli:
+- UNIQUE(project_id, asset_id): evita doppio collegamento dello stesso file.
+
+====================================================================
+9) SCHEMA marketing
+====================================================================
+
+9.1 marketing.profile
+Scopo:
+- Stato marketing del cliente nel progetto.
+
+Dettaglio campi:
+- project_id: relazione 1:1 con progetto.
+- has_crm: indica se il cliente usa gia un CRM.
+- knows_crm: indica se il cliente conosce il concetto di CRM.
+- runs_ads: indica se il cliente fa campagne ads attive.
+- tracking_ga4: tracking Google Analytics 4 abilitato/richiesto.
+- tracking_meta_pixel: tracking Meta Pixel abilitato/richiesto.
+- tracking_tiktok_pixel: tracking TikTok Pixel abilitato/richiesto.
+- notes: note marketing strategiche o operative.
+- updated_at: ultimo aggiornamento del profilo marketing.
+
+9.2 marketing.ad_channel
+Scopo:
+- Canali advertising usati/abilitati (es. IG, FB, TikTok, LinkedIn).
+
+Dettaglio campi:
+- id: identificatore canale.
+- project_id: progetto di riferimento.
+- channel_name: nome canale ads.
+- enabled: canale attivo/non attivo nel setup.
+
+Vincoli:
+- unico per (project_id, channel_name).
+
+9.3 marketing.marketplace_channel
+Scopo:
+- Canali marketplace (es. Amazon, eBay, ManoMano, Zalando).
+
+Dettaglio campi:
+- id: identificatore canale marketplace.
+- project_id: progetto di riferimento.
+- marketplace_name: nome marketplace.
+- enabled: indica se il canale e attivo.
+
+Vincoli:
+- unico per (project_id, marketplace_name).
+
+====================================================================
+10) SCHEMA sito
+====================================================================
+
+10.1 sito.site_brief
+Scopo:
+- Brief funzionale del sito raccolto durante brainstorming.
+
+Dettaglio campi:
+- project_id: relazione 1:1 con progetto.
+- inspiration_sites: siti di riferimento indicati dal cliente.
+- requested_menu: menu o voci richieste in modo libero.
+- needs_about_page: necessita pagina "Chi siamo".
+- needs_where_page: necessita pagina "Dove siamo".
+- needs_services_page: necessita pagina "Cosa facciamo/servizi".
+- needs_contact_form: necessita form contatti.
+- needs_external_links: necessita area con link esterni.
+- contact_form_email: casella dove inviare lead del form.
+- copy_mode: fonte testi (cliente, AI, o misto).
+- page_test_status: stato test pagine (non_iniziato, in_test, completato).
+- updated_at: ultimo aggiornamento brief.
+
+10.2 sito.page
+Scopo:
+- Elenco pagine/slot del sito.
+
+Dettaglio campi:
+- id: identificatore pagina.
+- project_id: progetto a cui la pagina appartiene.
+- page_key: chiave tecnica stabile (es. home, chi_siamo, contatti).
+- page_title: titolo visualizzato in UI/backoffice.
+- is_enabled: abilita/disabilita pagina senza eliminarla.
+- sort_order: ordine nel menu o nel builder.
+
+Vincoli:
+- page_key univoco per progetto.
+
+10.3 sito.page_content
+Scopo:
+- Contenuti versionati delle pagine.
+
+Dettaglio campi:
+- id: identificatore contenuto/versione.
+- page_id: pagina a cui il contenuto appartiene.
+- content_type: tipo dato salvato (testo, cta, html, json).
+- content_text: contenuto testuale o payload serializzato.
+- generated_by_ai: indica se il contenuto e stato generato da AI.
+- version_no: numero versione contenuto per storico modifiche.
+- updated_at: ultimo aggiornamento della versione.
+
+====================================================================
+11) SCHEMA dominio
+====================================================================
+
+11.1 dominio.domain_setup
+Scopo:
+- Gestione dominio e mailbox del progetto.
+
+Dettaglio campi:
+- project_id: relazione 1:1 con progetto.
+- has_existing_domain: se il cliente possiede gia un dominio.
+- existing_domain: dominio gia in possesso del cliente.
+- domain_to_register: dominio da acquistare se non esistente.
+- domain_purchase_started_at: inizio processo acquisto dominio.
+- domain_purchase_completed_at: fine processo acquisto dominio.
+- preferred_mailbox: mailbox desiderata (es. info@dominio.it).
+- mailbox_mode: mailbox fornita dal cliente o da generare.
+- updated_at: ultimo aggiornamento setup dominio.
+
+Vincoli:
+- completed_at non puo precedere started_at.
+
+====================================================================
+12) SCHEMA local_business
+====================================================================
+
+12.1 local_business.google_business_setup
+Scopo:
+- Stato Google My Business del cliente.
+
+Dettaglio campi:
+- project_id: relazione 1:1 con progetto.
+- has_profile: indica se scheda Google Business esiste gia.
+- profile_url: link scheda Google Business.
+- profile_creation_requested: richiesta creazione nuova scheda.
+- updated_at: ultimo aggiornamento setup local business.
+
+12.2 local_business.keyword
+Scopo:
+- Keyword raccolte per visibilita locale/SEO.
+
+Dettaglio campi:
+- id: identificatore keyword.
+- project_id: progetto a cui la keyword appartiene.
+- keyword: parola chiave obiettivo.
+- source: origine keyword (google_business, seo, altro).
+
+Vincoli:
+- keyword unica per progetto.
+
+====================================================================
+13) SCHEMA commerciale
+====================================================================
+
+13.1 commerciale.contract
+Scopo:
+- Gestione ciclo contratto (bozza, inviato, firmato, annullato).
+
+Dettaglio campi:
+- id: identificatore contratto.
+- project_id: progetto a cui il contratto appartiene.
+- contact_name: referente a cui e intestato l invio.
+- contact_email: email destinazione contratto.
+- asset_pdf_id: file PDF del contratto in media.asset.
+- status: stato ciclo vita (bozza, inviato, firmato, annullato).
+- sent_at: data invio contratto.
+- signed_at: data firma contratto.
+- created_at: data creazione record contratto.
+
+Vincoli:
+- signed_at non puo precedere sent_at.
+
+13.2 commerciale.order_administration
+Scopo:
+- Stato amministrativo ordine/progetto.
+
+Dettaglio campi:
+- project_id: relazione 1:1 col progetto.
+- purchased_service: servizio acquistato (vetrina o ecommerce).
+- payment_received: indica se pagamento risulta ricevuto.
+- paid_amount: importo pagato registrato.
+- payment_marked_at: data in cui il pagamento e stato confermato.
+- invoice_generated: indica se fattura e stata emessa.
+- invoice_number: numero fattura associato.
+- auto_invoice_enabled: abilita automazione emissione fattura.
+- updated_at: ultimo aggiornamento stato amministrativo.
+
+13.3 commerciale.payment_event
+Scopo:
+- Registro movimenti pagamento puntuali.
+
+Dettaglio campi:
+- id: identificatore evento pagamento.
+- project_id: progetto a cui il movimento si riferisce.
+- amount: importo ricevuto.
+- received_at: timestamp ricezione pagamento.
+- note: causale o note operative.
+- recorded_by_user_id: utente interno che registra il movimento.
+
+Perche serve:
+- storico contabile dettagliato oltre ai flag riassuntivi.
+
+====================================================================
+14) SCHEMA ai_ops
+====================================================================
+
+14.1 ai_ops.project_ai_settings
+Scopo:
+- Configurazione AI del progetto.
+
+Dettaglio campi:
+- project_id: relazione 1:1 col progetto.
+- initial_analysis_started_at: avvio lettura/analisi iniziale AI.
+- content_research_enabled: abilita supporto AI per ricerca contenuti.
+- seo_indexing_enabled: abilita modulo AI di indicizzazione/ottimizzazione.
+- seo_credits_total: crediti SEO acquistati/disponibili.
+- seo_credits_used: crediti SEO gia consumati.
+- updated_at: ultimo aggiornamento impostazioni AI.
+
+Vincoli:
+- seo_credits_used <= seo_credits_total.
+
+14.2 ai_ops.ai_activity
+Scopo:
+- Log operativo delle attivita AI.
+
+Dettaglio campi:
+- id: identificatore attivita AI.
+- project_id: progetto associato all attivita.
+- activity_type: tipo lavorazione AI (analisi, immagini, SEO, ecc.).
+- status: stato tecnico elaborazione (queued, running, completed, failed).
+- input_ref: riferimento input usato (asset, prompt, id esterno, ecc.).
+- result_summary: esito sintetico della lavorazione.
+- started_at: avvio esecuzione.
+- finished_at: termine esecuzione.
+
+Vincoli:
+- finished_at non puo precedere started_at.
+
+====================================================================
+15) SCHEMA integrazioni
+====================================================================
+
+15.1 integrazioni.tool_catalog
+Scopo:
+- Catalogo tool integrabili (CRM, analytics, newsletter, automazioni, ecc.).
+
+Dettaglio campi:
+- id: identificatore tool.
+- tool_code: codice tecnico univoco (stabile nelle integrazioni).
+- tool_name: nome leggibile tool.
+- category: famiglia funzionale (marketing, crm, analytics, ecc.).
+- description: descrizione uso/informazioni per backoffice.
+
+15.2 integrazioni.project_tool_connection
+Scopo:
+- Connessione tra progetto e tool esterno.
+
+Dettaglio campi:
+- id: identificatore connessione.
+- project_id: progetto in cui la connessione viene usata.
+- tool_id: tool esterno dal catalogo.
+- api_key_ciphertext: API key cifrata.
+- api_secret_ciphertext: secret/token cifrato.
+- config_json: configurazione estensibile (endpoint, account id, opzioni).
+- enabled: connessione attiva/non attiva.
+- last_tested_at: ultimo test tecnico riuscito/fallito.
+- created_at: data creazione configurazione.
+
+Vincoli:
+- UNIQUE(project_id, tool_id): una sola connessione per tool nello stesso progetto.
+
+Perche serve:
+- centralizza API key e configurazioni integrazione in modo estendibile.
+
+====================================================================
+16) SCHEMA ecommerce
+====================================================================
+
+16.1 ecommerce.store_setup
+Scopo:
+- Configurazione e-commerce generale.
+
+Dettaglio campi:
+- project_id: relazione 1:1 col progetto ecommerce.
+- purchase_enabled: abilita funnel acquisto sul sito.
+- auto_renewal_enabled: abilita rinnovo automatico servizi/prodotti previsti.
+- rid_enabled: abilita pagamento RID/sepa dove applicabile.
+- csv_import_enabled: abilita onboarding prodotti via file CSV.
+- csv_import_instructions_sent_at: data invio istruzioni CSV al cliente.
+- updated_at: ultimo aggiornamento setup ecommerce.
+
+16.2 ecommerce.accepted_payment_method
+Scopo:
+- Metodi pagamento accettati.
+
+Dettaglio campi:
+- id: identificatore metodo.
+- project_id: progetto ecommerce di riferimento.
+- method_code: codice tecnico metodo (es. card, paypal, bonifico).
+- display_name: etichetta visibile in pannello/frontend.
+- enabled: metodo attivo/non attivo.
+
+Vincoli:
+- unico per (project_id, method_code).
+
+16.3 ecommerce.accepted_carrier
+Scopo:
+- Corrieri accettati per spedizione.
+
+Dettaglio campi:
+- id: identificatore corriere.
+- project_id: progetto ecommerce di riferimento.
+- carrier_code: codice tecnico corriere.
+- display_name: nome leggibile corriere.
+- enabled: corriere attivo/non attivo.
+
+Vincoli:
+- unico per (project_id, carrier_code).
+
+16.4 ecommerce.product_category
+Scopo:
+- Categorie prodotto con gerarchia opzionale (parent_category_id).
+
+Dettaglio campi:
+- id: identificatore categoria.
+- project_id: progetto ecommerce a cui appartiene.
+- parent_category_id: categoria padre per gerarchia ad albero.
+- name: nome categoria.
+- slug: identificatore URL friendly.
+- description: descrizione estesa categoria.
+- sort_order: ordine di visualizzazione.
+- active: categoria attiva/non attiva.
+
+Vincoli:
+- slug unico per progetto.
+
+16.5 ecommerce.product_import_job
+Scopo:
+- Tracciamento import prodotti da CSV.
+
+Dettaglio campi:
+- id: identificatore job import.
+- project_id: progetto ecommerce di riferimento.
+- source_asset_id: file CSV sorgente collegato in media.asset.
+- status: stato tecnico job (received, processing, completed, failed).
+- rows_total: numero righe totali lette dal CSV.
+- rows_imported: numero righe importate con successo.
+- error_log: dettaglio errori di parsing/validazione.
+- received_at: timestamp ricezione file/job.
+- processed_at: timestamp fine processamento.
+
+Vincoli:
+- processed_at non puo precedere received_at.
+
+====================================================================
+17) FUNZIONE E TRIGGER updated_at
+====================================================================
+
+17.1 core.set_updated_at()
+Scopo:
+- Funzione trigger riusabile che aggiorna NEW.updated_at = now().
+
+17.2 Trigger su tabelle con updated_at
+Scopo:
+- Aggiornare automaticamente updated_at ad ogni UPDATE.
+- Prima viene fatto DROP TRIGGER IF EXISTS per permettere riesecuzione script.
+
+Tabelle coperte:
+- core.client_company
+- core.web_project
+- anagrafica.company_profile
+- anagrafica.company_contact
+- crm.crm_contact
+- legale.legal_profile
+- brand.identity_profile
+- marketing.profile
+- sito.site_brief
+- sito.page_content
+- dominio.domain_setup
+- local_business.google_business_setup
+- commerciale.order_administration
+- ai_ops.project_ai_settings
+- ecommerce.store_setup
+
+====================================================================
+18) CHIUSURA TRANSAZIONE
+====================================================================
+
+18.1 COMMIT;
+- Conferma definitiva di tutte le creazioni.
+- Se tutte le istruzioni sono andate a buon fine, lo schema e pronto.
+
+====================================================================
+19) COME USARE QUESTA BASE
+====================================================================
+
+- Questa e una base strutturale robusta per Spring Boot + PostgreSQL.
+- Il frontend puo compilare i form step-by-step salvando:
+  anagrafica/CRM -> onboarding.question_answer -> tabelle specifiche per dominio.
+- La separazione a schemi permette crescita senza confondere responsabilita.
+
+Nota pratica:
+- I campi sensibili in integrazioni (api_key_ciphertext, api_secret_ciphertext)
+  sono predisposti per contenere valori gia cifrati lato applicazione.

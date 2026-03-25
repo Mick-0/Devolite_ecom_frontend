@@ -1,0 +1,50 @@
+﻿<!DOCTYPE html>
+<html lang="it" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Devolite | Accesso</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="/favicon_io/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon_io/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon_io/favicon-16x16.png" />
+  <link rel="icon" href="/favicon_io/favicon.ico" sizes="any" />
+  <link rel="manifest" href="/favicon_io/site.webmanifest" />
+
+<link rel="stylesheet" th:href="@{/css/app.css}" />
+</head>
+<body class="login-page">
+  <div class="app" style="grid-template-columns: 1fr; max-width: 520px;">
+    <div class="card">
+      <h2 class="brand" style="margin-top:0"><img src="/assets/brand/devolite_logo_hd.png" th:src="@{/assets/brand/devolite_logo_hd.png}" alt="Devolite" /></h2>
+      <p class="note">Accedi per raccogliere i dati del cliente</p>
+      <form th:action="@{/login}" method="post" class="login-form">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+        <div class="grid-1">
+          <div class="field">
+            <label for="username">Nome utente</label>
+            <input id="username" name="username" type="text" autocomplete="username" />
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" />
+          </div>
+        </div>
+        <div class="actions" style="margin-top:16px;">
+          <button class="primary" type="submit">Accedi</button>
+        </div>
+        <div class="note" th:if="${param.error}">Credenziali non valide</div>
+        <div class="note" th:if="${param.logout}">Disconnessione effettuata</div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
+
+
+
+
+
+
+
+
+

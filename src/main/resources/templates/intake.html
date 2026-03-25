@@ -1,0 +1,543 @@
+﻿<!DOCTYPE html>
+<html lang="it" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Devolite | Raccolta Dati</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="/favicon_io/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon_io/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon_io/favicon-16x16.png" />
+  <link rel="icon" href="/favicon_io/favicon.ico" sizes="any" />
+  <link rel="manifest" href="/favicon_io/site.webmanifest" />
+
+<link rel="stylesheet" th:href="@{/css/app.css}" />
+</head>
+<body th:attr="data-enforce-section-lock=${enforceSectionLock}">
+  <div class="app">
+    <aside class="side">
+      <h1 class="brand"><img src="/assets/brand/devolite_mark.png" th:src="@{/assets/brand/devolite_mark.png}" alt="Devolite" /></h1>
+      <p>Raccolta dati rapida e strutturata</p>
+      <div class="form-progress form-progress--side" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="form-progress__meta">
+          <span class="form-progress__title">Avanzamento</span>
+          <span class="form-progress__value" data-progress-value>0% (0/0)</span>
+        </div>
+        <div class="form-progress__track">
+          <div class="form-progress__fill" data-progress-fill></div>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="#company" data-section="company"><span class="nav-indicator"></span><span class="nav-title">Azienda</span></a>
+        <a href="#contact" data-section="contact"><span class="nav-indicator"></span><span class="nav-title">Contatto</span></a>
+        <a href="#project" data-section="project"><span class="nav-indicator"></span><span class="nav-title">Progetto</span></a>
+        <a href="#crm" data-section="crm"><span class="nav-indicator"></span><span class="nav-title">CRM</span></a>
+        <a href="#legal" data-section="legal"><span class="nav-indicator"></span><span class="nav-title">Legale</span></a>
+        <a href="#brand" data-section="brand"><span class="nav-indicator"></span><span class="nav-title">Marchio</span></a>
+        <a href="#marketing" data-section="marketing"><span class="nav-indicator"></span><span class="nav-title">Marketing</span></a>
+        <a href="#site" data-section="site"><span class="nav-indicator"></span><span class="nav-title">Brief Sito</span></a>
+        <a href="#domain" data-section="domain"><span class="nav-indicator"></span><span class="nav-title">Dominio</span></a>
+        <a href="#local" data-section="local"><span class="nav-indicator"></span><span class="nav-title">Attività Locale</span></a>
+        <a href="#commercial" data-section="commercial"><span class="nav-indicator"></span><span class="nav-title">Commerciale</span></a>
+        <a href="#ai" data-section="ai"><span class="nav-indicator"></span><span class="nav-title">IA</span></a>
+        <a href="#ecommerce" data-section="ecommerce"><span class="nav-indicator"></span><span class="nav-title">E-commerce</span></a>
+        <a href="#files" data-section="files"><span class="nav-indicator"></span><span class="nav-title">File</span></a>
+      </nav>
+    </aside>
+
+    <main>
+      <div class="header">
+        <div>
+          <h2>Scheda Cliente</h2>
+        </div>
+        <div class="header-actions">
+          <button type="button" class="secondary" data-open-existing>Modifica scheda esistente</button>
+          <form th:action="@{/logout}" method="post" class="logout-form">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+            <button type="submit" class="secondary secondary--ghost">Logout</button>
+          </form>
+          <div class="badge" th:if="${saved}">Salvato</div>
+        </div>
+      </div>
+      <div class="form-alert form-alert--error" th:if="${projectLookupError}">
+        [[${projectLookupError}]]
+      </div>
+      <form id="intakeForm" class="intake-form" th:action="@{/intake}" th:object="${form}" method="post" enctype="multipart/form-data">
+        <input type="hidden" th:field="*{companyId}" />
+        <input type="hidden" th:field="*{projectId}" id="projectId" />
+        <input type="hidden" th:field="*{draftId}" id="draftId" />
+        <input type="hidden" id="csrfHeader" th:value="${_csrf.headerName}" />
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+        <div class="form-alert" th:if="${#fields.hasErrors()}">
+          Completa i campi obbligatori evidenziati prima di salvare.
+        </div>
+
+        <section id="company" class="card">
+          <h3>Azienda</h3>
+          <div class="grid">
+            <div class="field" th:classappend="${#fields.hasErrors('legalName')} ? 'has-error'">
+              <label>Ragione sociale</label>
+              <input type="text" th:field="*{legalName}" placeholder="Acme Srl" required data-required-message="Inserisci la ragione sociale." />
+              <p class="error" th:if="${#fields.hasErrors('legalName')}" th:errors="*{legalName}">Obbligatorio</p>
+            </div>
+            <div class="field">
+              <label>Settore</label>
+              <input type="text" th:field="*{industry}" placeholder="Commercio al dettaglio" />
+            </div>
+            <div class="field">
+              <label>Partita IVA</label>
+              <input type="text" th:field="*{vatNumber}" placeholder="IT12345678901" pattern="IT.*" title="La partita IVA deve iniziare con IT" />
+            </div>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Indirizzo</label><input type="text" th:field="*{street}" placeholder="Via Roma 1" /></div>
+            <div class="field"><label>Città</label><input type="text" th:field="*{city}" placeholder="Milano" /></div>
+            <div class="field"><label>Provincia</label><input type="text" th:field="*{province}" placeholder="MI" /></div>
+          </div>
+          <div class="grid">
+            <div class="field"><label>CAP</label><input type="text" th:field="*{postalCode}" placeholder="20121" /></div>
+            <div class="field"><label>Codice paese</label><input type="text" th:field="*{countryCode}" placeholder="IT" minlength="2" maxlength="2" pattern="[A-Za-z]{2}" title="Inserisci 2 lettere (es. IT)" /></div>
+            <div class="field"><label>Categoria</label><input type="text" th:field="*{category}" placeholder="Abbigliamento" /></div>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Anno di fondazione</label><input type="number" th:field="*{founderYears}" placeholder="2012" min="0" /></div>
+            <div class="field"><label>Fatturato annuo</label><input type="number" step="0.01" th:field="*{annualRevenue}" placeholder="2500000" min="0" /></div>
+            <div class="field"><label>Fonte segnalazione</label><input type="text" th:field="*{referralSource}" placeholder="Passaparola" /></div>
+          </div>
+        </section>
+
+        <section id="contact" class="card">
+          <h3>Referente principale</h3>
+          <div class="grid">
+            <div class="field"><label>Nome completo</label><input type="text" th:field="*{contactFullName}" placeholder="Mario Rossi" required /></div>
+            <div class="field"><label>Telefono</label><input type="tel" th:field="*{contactPhone}" placeholder="+39 02 1234567" pattern="\+39.*" title="Il numero deve iniziare con +39" /></div>
+            <div class="field"><label>Telefono secondario</label><input type="tel" th:field="*{contactPhoneSecondary}" placeholder="+39 333 1234567" pattern="\+39.*" title="Il numero deve iniziare con +39" /></div>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Email</label><input type="email" th:field="*{contactEmail}" placeholder="mario.rossi@acme.it" /></div>
+            <div class="field"><label>Email secondaria</label><input type="email" th:field="*{contactEmailSecondary}" placeholder="info@acme.it" /></div>
+            <div class="field"><label>Ruolo</label><input type="text" th:field="*{contactRoleTitle}" placeholder="CEO" /></div>
+          </div>
+          <div class="grid-1">
+            <div class="field"><label>Note</label><textarea th:field="*{contactNotes}" placeholder="Disponibile al mattino."></textarea></div>
+          </div>
+        </section>
+
+        <section id="project" class="card">
+          <h3>Progetto</h3>
+          <div class="grid">
+            <div class="field" th:classappend="${#fields.hasErrors('projectName')} ? 'has-error'">
+              <label>Nome progetto</label>
+              <input type="text" th:field="*{projectName}" placeholder="Nuovo e-commerce Acme" required data-required-message="Inserisci il nome del progetto." />
+              <p class="error" th:if="${#fields.hasErrors('projectName')}" th:errors="*{projectName}">Obbligatorio</p>
+            </div>
+            <div class="field">
+              <label>Tipo progetto</label>
+              <select th:field="*{projectKind}" required data-required-message="Seleziona il tipo di progetto.">
+                <option value="">Seleziona...</option>
+                <option value="vetrina">Vetrina</option>
+                <option value="ecommerce">E-commerce</option>
+              </select>
+              <p class="error" th:if="${#fields.hasErrors('projectKind')}" th:errors="*{projectKind}">Obbligatorio</p>
+            </div>
+                        <div class="field">
+              <label>Stato</label>
+              <select th:field="*{status}">
+                <option value="">Seleziona...</option>
+                <option value="in_discovery">In analisi</option>
+                <option value="onboarding">Avvio</option>
+                <option value="in_production">In produzione</option>
+                <option value="delivered">Consegnato</option>
+                <option value="archived">Archiviato</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Risultato atteso</label><input type="text" th:field="*{expectedOutcome}" placeholder="Aumentare vendite online" /></div>
+            <div class="field"><label>Canale di acquisizione</label><input type="text" th:field="*{sourceChannel}" placeholder="Segnalazione" /></div>
+          </div>
+        </section>
+
+        <section id="crm" class="card">
+          <h3>CRM</h3>
+          <div class="grid">
+            <div class="field"><label>Nome</label><input type="text" th:field="*{crmFirstName}" placeholder="Mario" /></div>
+            <div class="field"><label>Cognome</label><input type="text" th:field="*{crmLastName}" placeholder="Rossi" /></div>
+            <div class="field"><label>Telefono</label><input type="tel" th:field="*{crmPhone}" placeholder="+39 333 1234567" pattern="\+39.*" title="Il numero deve iniziare con +39" /></div>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Email</label><input type="email" th:field="*{crmEmail}" placeholder="mario.rossi@acme.it" /></div>
+            <div class="field"><label>Email secondaria</label><input type="email" th:field="*{crmEmailSecondary}" placeholder="crm@acme.it" /></div>
+            <div class="field"><label>Nome lista</label><input type="text" th:field="*{crmListName}" placeholder="Lead T1" /></div>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Nome azienda (snapshot)</label><input type="text" th:field="*{crmCompanyNameSnapshot}" placeholder="Acme Srl" /></div>
+            <div class="field"><label>Settore</label><input type="text" th:field="*{crmSector}" placeholder="Commercio al dettaglio" /></div>
+            <div class="field"><label>Partita IVA (snapshot)</label><input type="text" th:field="*{crmVatNumber}" placeholder="IT12345678901" pattern="IT.*" title="La partita IVA deve iniziare con IT" /></div>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Temperatura interesse</label><input type="text" th:field="*{crmInterestTemperature}" placeholder="Caldo" /></div>
+            <div class="field"><label>Data prima chiamata</label><input type="date" th:field="*{crmFirstCallDate}" /></div>
+            <div class="field"><label>Data seconda chiamata</label><input type="date" th:field="*{crmSecondCallDate}" /></div>
+          </div>
+          <div class="grid">
+            <div class="field"><label>CTA</label><input type="text" th:field="*{crmCta}" placeholder="Inviare offerta" /></div>
+            <div class="field"><label>Fase corrente</label>
+              <select th:field="*{crmCurrentStage}">
+                <option value="">Seleziona...</option>
+                <option value="lead">Lead</option>
+                <option value="prospect">Potenziale</option>
+                <option value="cliente">Cliente</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid-1">
+            <div class="field"><label>Note</label><textarea th:field="*{crmNotes}" placeholder="Interessati a campagne ADV e SEO."></textarea></div>
+          </div>
+        </section>
+
+        <section id="legal" class="card">
+          <h3>Legale</h3>
+          <div class="grid">
+            <div class="field">
+              <label>Modalità supporto</label>
+              <select th:field="*{legalSupportMode}">
+                <option value="">Seleziona...</option>
+                <option value="consulente_cliente">Consulente del cliente</option>
+                <option value="integrazione_iubenda">Integrazione Iubenda</option>
+                <option value="da_definire">Da definire</option>
+              </select>
+            </div>
+            <div class="field"><label>Partita IVA</label><input type="text" th:field="*{legalVatNumber}" placeholder="IT12345678901" pattern="IT.*" title="La partita IVA deve iniziare con IT" /></div>
+            <div class="field"><label>Numero REA</label><input type="text" th:field="*{legalReaNumber}" placeholder="MI-123456" /></div>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Capitale sociale</label><input type="number" step="0.01" th:field="*{legalShareCapital}" placeholder="50000" min="0" /></div>
+            <div class="field"><label>Email PEC</label><input type="email" th:field="*{legalPecEmail}" placeholder="pec@acme.it" /></div>
+            <div class="field"><label>CTA footer</label><input type="text" th:field="*{legalFooterCta}" placeholder="Contattaci per una demo." /></div>
+          </div>
+          <div class="grid">
+            <label class="check-row"><input type="checkbox" th:field="*{legalPrivacyCompleted}" /> Privacy completata</label>
+            <label class="check-row"><input type="checkbox" th:field="*{legalTermsCompleted}" /> Termini completati</label>
+          </div>
+        </section>
+
+        <section id="brand" class="card">
+          <h3>Marchio</h3>
+          <div class="grid">
+            <div class="field"><label>Colore primario</label><input type="text" th:field="*{primaryColor}" placeholder="#0f766e" pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" title="Inserisci un colore esadecimale (#RGB o #RRGGBB)" /></div>
+            <div class="field"><label>Colore secondario</label><input type="text" th:field="*{secondaryColor}" placeholder="#c05621" pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" title="Inserisci un colore esadecimale (#RGB o #RRGGBB)" /></div>
+            <div class="field"><label>Colore accento 1</label><input type="text" th:field="*{accentColor1}" placeholder="#f59e0b" pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" title="Inserisci un colore esadecimale (#RGB o #RRGGBB)" /></div>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Colore accento 2</label><input type="text" th:field="*{accentColor2}" placeholder="#10b981" pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" title="Inserisci un colore esadecimale (#RGB o #RRGGBB)" /></div>
+            <div class="field">
+              <label>Policy font</label>
+              <select th:field="*{fontPolicy}">
+                <option value="">Seleziona...</option>
+                <option value="font_aziendali">Font aziendali</option>
+                <option value="da_selezionare">Da selezionare</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Fonte asset visivi</label>
+              <select th:field="*{visualAssetSource}">
+                <option value="">Seleziona...</option>
+                <option value="fornite_cliente">Fornite dal cliente</option>
+                <option value="stock">Stock</option>
+                <option value="misto">Misto</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid">
+            <div class="field">
+              <label>Tono di voce</label>
+              <select th:field="*{toneOfVoice}">
+                <option value="">Seleziona...</option>
+                <option value="formale">Formale</option>
+                <option value="amichevole">Amichevole</option>
+                <option value="tecnico">Tecnico</option>
+                <option value="emozionale">Emozionale</option>
+                <option value="altro">Altro</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid">
+            <label class="check-row"><input type="checkbox" th:field="*{logoRestyleRequired}" /> Restyling richiesto</label>
+            <label class="check-row"><input type="checkbox" th:field="*{logoRestyleGenerated}" /> Restyling generato</label>
+            <label class="check-row"><input type="checkbox" th:field="*{logoApproved}" /> Logo approvato</label>
+          </div>
+        </section>
+
+        <section id="marketing" class="card">
+          <h3>Marketing</h3>
+          <div class="grid">
+            <label class="check-row"><input type="checkbox" th:field="*{marketingHasCrm}" /> Ha CRM</label>
+            <label class="check-row"><input type="checkbox" th:field="*{marketingKnowsCrm}" /> Conosce CRM</label>
+            <label class="check-row"><input type="checkbox" th:field="*{marketingRunsAds}" /> Fa advertising</label>
+          </div>
+          <div class="grid">
+            <label class="check-row"><input type="checkbox" th:field="*{trackingGa4}" /> GA4</label>
+            <label class="check-row"><input type="checkbox" th:field="*{trackingMetaPixel}" /> Meta Pixel</label>
+            <label class="check-row"><input type="checkbox" th:field="*{trackingTiktokPixel}" /> TikTok Pixel</label>
+          </div>
+          <div class="grid-1">
+            <div class="field"><label>Note marketing</label><textarea th:field="*{marketingNotes}" placeholder="Budget ADV ~1000 EUR/mese."></textarea></div>
+          </div>
+          <div class="grid-1">
+            <label>Canali ADV</label>
+            <div class="pill-group">
+              <label class="pill"><input type="checkbox" th:field="*{adChannels}" value="instagram" /> Instagram</label>
+              <label class="pill"><input type="checkbox" th:field="*{adChannels}" value="facebook" /> Facebook</label>
+              <label class="pill"><input type="checkbox" th:field="*{adChannels}" value="tiktok" /> TikTok</label>
+              <label class="pill"><input type="checkbox" th:field="*{adChannels}" value="linkedin" /> LinkedIn</label>
+              <label class="pill"><input type="checkbox" th:field="*{adChannels}" value="google" /> Google</label>
+            </div>
+          </div>
+          <div class="grid-1">
+            <label>Canali marketplace</label>
+            <div class="pill-group">
+              <label class="pill"><input type="checkbox" th:field="*{marketplaceChannels}" value="amazon" /> Amazon</label>
+              <label class="pill"><input type="checkbox" th:field="*{marketplaceChannels}" value="ebay" /> eBay</label>
+              <label class="pill"><input type="checkbox" th:field="*{marketplaceChannels}" value="manomano" /> ManoMano</label>
+              <label class="pill"><input type="checkbox" th:field="*{marketplaceChannels}" value="zalando" /> Zalando</label>
+              <label class="pill"><input type="checkbox" th:field="*{marketplaceChannels}" value="altro" /> Altro</label>
+            </div>
+          </div>
+        </section>
+
+        <section id="site" class="card">
+          <h3>Brief Sito</h3>
+          <div class="grid-1">
+            <div class="field"><label>Siti di ispirazione</label><textarea th:field="*{inspirationSites}" placeholder="https://example.com&#10;https://brand.com"></textarea></div>
+            <div class="field"><label>Menu richiesto</label><textarea th:field="*{requestedMenu}" placeholder="Home&#10;Shop&#10;Chi siamo&#10;Contatti"></textarea></div>
+          </div>
+          <div class="grid">
+            <label class="check-row"><input type="checkbox" th:field="*{needsAboutPage}" /> Pagina chi siamo</label>
+            <label class="check-row"><input type="checkbox" th:field="*{needsWherePage}" /> Pagina dove siamo</label>
+            <label class="check-row"><input type="checkbox" th:field="*{needsServicesPage}" /> Pagina servizi</label>
+          </div>
+          <div class="grid">
+            <label class="check-row"><input type="checkbox" th:field="*{needsContactForm}" /> Modulo contatti</label>
+            <label class="check-row"><input type="checkbox" th:field="*{needsExternalLinks}" /> Link esterni</label>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Email modulo contatti</label><input type="email" th:field="*{contactFormEmail}" placeholder="contatti@acme.it" /></div>
+            <div class="field">
+              <label>Modalità testi</label>
+              <select th:field="*{copyMode}">
+                <option value="">Seleziona...</option>
+                <option value="scrivi_cliente">Testi del cliente</option>
+                <option value="genera_ai">Testi generati con IA</option>
+                <option value="misto">Misto</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Stato test pagine</label>
+              <select th:field="*{pageTestStatus}">
+                <option value="">Seleziona...</option>
+                <option value="non_iniziato">Non iniziato</option>
+                <option value="in_test">In test</option>
+                <option value="completato">Completato</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <section id="domain" class="card">
+          <h3>Dominio</h3>
+          <div class="grid">
+            <label class="check-row"><input type="checkbox" th:field="*{hasExistingDomain}" /> Ha già un dominio</label>
+            <div class="field"><label>Dominio esistente</label><input type="text" th:field="*{existingDomain}" placeholder="acme.it" /></div>
+            <div class="field"><label>Dominio da registrare</label><input type="text" th:field="*{domainToRegister}" placeholder="acme-store.it" /></div>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Acquisto iniziato</label><input type="datetime-local" th:field="*{domainPurchaseStartedAt}" /></div>
+            <div class="field"><label>Acquisto completato</label><input type="datetime-local" th:field="*{domainPurchaseCompletedAt}" /></div>
+            <div class="field"><label>Mailbox preferita</label><input type="text" th:field="*{preferredMailbox}" placeholder="info@acme.it" /></div>
+          </div>
+          <div class="grid">
+            <div class="field">
+              <label>Modalità mailbox</label>
+              <select th:field="*{mailboxMode}">
+                <option value="">Seleziona...</option>
+                <option value="fornita_cliente">Fornita dal cliente</option>
+                <option value="genera">Da generare</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <section id="local" class="card">
+          <h3>Attività Locale</h3>
+          <div class="grid">
+            <label class="check-row"><input type="checkbox" th:field="*{gbHasProfile}" /> Ha Google Business</label>
+            <label class="check-row"><input type="checkbox" th:field="*{gbProfileCreationRequested}" /> Richiedi creazione</label>
+            <div class="field"><label>URL profilo</label><input type="text" th:field="*{gbProfileUrl}" placeholder="https://g.page/acme" /></div>
+          </div>
+          <div class="grid-1">
+            <div class="field"><label>Parole chiave (separate da virgola o a capo)</label><textarea th:field="*{gbKeywords}" placeholder="abbigliamento, fashion, milano"></textarea></div>
+          </div>
+        </section>
+
+        <section id="commercial" class="card">
+          <h3>Commerciale</h3>
+          <div class="grid">
+            <div class="field">
+              <label>Servizio acquistato</label>
+              <select th:field="*{purchasedService}">
+                <option value="">Seleziona...</option>
+                <option value="vetrina">Vetrina</option>
+                <option value="ecommerce">E-commerce</option>
+              </select>
+            </div>
+            <label class="check-row"><input type="checkbox" th:field="*{paymentReceived}" /> Pagamento ricevuto</label>
+            <div class="field"><label>Importo pagato</label><input type="number" step="0.01" th:field="*{paidAmount}" placeholder="1200.00" min="0" /></div>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Pagamento registrato il</label><input type="datetime-local" th:field="*{paymentMarkedAt}" /></div>
+            <label class="check-row"><input type="checkbox" th:field="*{invoiceGenerated}" /> Fattura generata</label>
+            <div class="field"><label>Numero fattura</label><input type="text" th:field="*{invoiceNumber}" placeholder="FAT-2026-001" /></div>
+          </div>
+          <div class="grid">
+            <label class="check-row"><input type="checkbox" th:field="*{autoInvoiceEnabled}" /> Autofattura abilitata</label>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label>Referente contratto</label><input type="text" th:field="*{contractContactName}" placeholder="Giulia Bianchi" /></div>
+            <div class="field"><label>Email referente contratto</label><input type="email" th:field="*{contractContactEmail}" placeholder="giulia.bianchi@acme.it" /></div>
+          </div>
+          <div class="grid">
+                        <div class="field">
+              <label>Stato contratto</label>
+              <select th:field="*{contractStatus}">
+                <option value="">Seleziona...</option>
+                <option value="bozza">Bozza</option>
+                <option value="inviato">Inviato</option>
+                <option value="firmato">Firmato</option>
+                <option value="annullato">Annullato</option>
+              </select>
+            </div>
+            <div class="field"><label>Inviato il</label><input type="datetime-local" th:field="*{contractSentAt}" /></div>
+            <div class="field"><label>Firmato il</label><input type="datetime-local" th:field="*{contractSignedAt}" /></div>
+          </div>
+        </section>
+
+        <section id="ai" class="card">
+          <h3>IA</h3>
+          <div class="grid">
+            <div class="field"><label>Analisi iniziale avviata</label><input type="datetime-local" th:field="*{aiInitialAnalysisStartedAt}" /></div>
+            <label class="check-row"><input type="checkbox" th:field="*{aiContentResearchEnabled}" /> Ricerca contenuti attiva</label>
+            <label class="check-row"><input type="checkbox" th:field="*{aiSeoIndexingEnabled}" /> Indicizzazione SEO attiva</label>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Crediti SEO totali</label><input type="number" th:field="*{aiSeoCreditsTotal}" placeholder="100" min="0" required /></div>
+            <div class="field"><label>Crediti SEO usati</label><input type="number" th:field="*{aiSeoCreditsUsed}" placeholder="20" min="0" required /></div>
+          </div>
+        </section>
+
+        <section id="ecommerce" class="card">
+          <h3>E-commerce</h3>
+          <div class="grid">
+            <label class="check-row"><input type="checkbox" th:field="*{purchaseEnabled}" /> Acquisti abilitati</label>
+            <label class="check-row"><input type="checkbox" th:field="*{autoRenewalEnabled}" /> Rinnovo automatico</label>
+            <label class="check-row"><input type="checkbox" th:field="*{ridEnabled}" /> RID abilitato</label>
+          </div>
+          <div class="grid">
+            <label class="check-row"><input type="checkbox" th:field="*{csvImportEnabled}" /> Import CSV abilitato</label>
+            <div class="field"><label>Istruzioni CSV inviate il</label><input type="datetime-local" th:field="*{csvImportInstructionsSentAt}" /></div>
+          </div>
+          <div class="grid-1">
+            <label>Metodi di pagamento</label>
+            <div class="pill-group">
+              <label class="pill"><input type="checkbox" th:field="*{paymentMethods}" value="card" /> Carta</label>
+              <label class="pill"><input type="checkbox" th:field="*{paymentMethods}" value="paypal" /> PayPal</label>
+              <label class="pill"><input type="checkbox" th:field="*{paymentMethods}" value="bonifico" /> Bonifico</label>
+              <label class="pill"><input type="checkbox" th:field="*{paymentMethods}" value="cash" /> Contanti</label>
+            </div>
+          </div>
+          <div class="grid-1">
+            <label>Corrieri</label>
+            <div class="pill-group">
+              <label class="pill"><input type="checkbox" th:field="*{carriers}" value="gls" /> GLS</label>
+              <label class="pill"><input type="checkbox" th:field="*{carriers}" value="dhl" /> DHL</label>
+              <label class="pill"><input type="checkbox" th:field="*{carriers}" value="sda" /> SDA</label>
+              <label class="pill"><input type="checkbox" th:field="*{carriers}" value="bartolini" /> Bartolini</label>
+            </div>
+          </div>
+          <div class="grid-1">
+            <div class="field"><label>Categorie prodotti (separate da virgola o a capo)</label><textarea th:field="*{productCategories}" placeholder="Abbigliamento uomo&#10;Accessori&#10;Scarpe"></textarea></div>
+          </div>
+        </section>
+
+        <section id="files" class="card">
+          <h3>File</h3>
+          <div class="grid">
+            <div class="field">
+              <label>File logo</label>
+              <input type="file" th:field="*{logoFile}" />
+              <input type="text" th:field="*{logoComment}" placeholder="Logo vettoriale in formato SVG." />
+            </div>
+            <div class="field">
+              <label>File visura</label>
+              <input type="file" th:field="*{visuraFile}" />
+              <input type="text" th:field="*{visuraComment}" placeholder="Visura camerale aggiornata." />
+            </div>
+            <div class="field">
+              <label>Contratto PDF</label>
+              <input type="file" th:field="*{contractFile}" />
+              <input type="text" th:field="*{contractComment}" placeholder="Contratto firmato digitalmente." />
+            </div>
+          </div>
+          <div class="note">I file sono salvati sul server e collegati a media.asset.</div>
+        </section>
+
+        <div class="actions">
+          <button type="submit" class="primary">Salva scheda</button>
+        </div>
+      </form>
+
+      <div class="modal" id="existingProjectModal" data-existing-modal aria-hidden="true">
+        <div class="modal-backdrop" data-modal-close></div>
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="existingProjectTitle">
+          <div class="modal-header">
+            <h3 id="existingProjectTitle">Modifica form esistente</h3>
+            <button type="button" class="icon-button" data-modal-close aria-label="Chiudi">&times;</button>
+          </div>
+          <p class="modal-subtitle">Seleziona un progetto recente o cerca per nome.</p>
+          <div class="modal-search">
+            <input type="text" data-project-search placeholder="Cerca per nome progetto" />
+            <button type="button" class="secondary" data-project-open>Apri</button>
+          </div>
+          <div class="modal-status" data-project-status></div>
+          <div class="modal-list" data-project-list>
+            <div class="modal-empty">Caricamento...</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script th:inline="javascript">
+    window.__confirmedSections = /*[[${confirmedSections}]]*/ [];
+    window.__enforceSectionLock = /*[[${enforceSectionLock}]]*/ true;
+  </script>
+  <script th:src="@{/js/app.js(v=${@environment.getProperty('app.assets.version','1')})}"></script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

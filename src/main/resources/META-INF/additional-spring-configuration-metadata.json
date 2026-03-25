@@ -1,0 +1,56 @@
+{
+  "properties": [
+    {
+      "name": "app.storage.root",
+      "type": "java.lang.String",
+      "description": "Base path for uploaded assets."
+    },
+    {
+      "name": "app.admin.username",
+      "type": "java.lang.String",
+      "description": "Admin username created at startup."
+    },
+    {
+      "name": "app.admin.password",
+      "type": "java.lang.String",
+      "description": "Admin password (required to create admin user)."
+    },
+    {
+      "name": "app.admin.full-name",
+      "type": "java.lang.String",
+      "description": "Admin display name."
+    },
+    {
+      "name": "app.admin.email",
+      "type": "java.lang.String",
+      "description": "Admin email address."
+    },
+    {
+      "name": "app.security.require-https",
+      "type": "java.lang.Boolean",
+      "description": "Force HTTPS for all requests."
+    },
+    {
+      "name": "app.security.trust-forwarded-headers",
+      "type": "java.lang.Boolean",
+      "description": "Trust X-Forwarded-* headers when enforcing HTTPS."
+    },
+    {
+      "name": "app.security.redirect-host",
+      "type": "java.lang.String",
+      "description": "Canonical host for HTTPS redirects (host[:port])."
+    },
+    {
+      "name": "app.intake.enforce-section-order",
+      "type": "java.lang.Boolean",
+      "description": "Enforce sequential section confirmation in intake."
+    },
+    {
+      "name": "app.intake.prefill-samples",
+      "type": "java.lang.Boolean",
+      "description": "Auto-fill intake form with sample values (dev/demo only)."
+    }
+  ]
+}
+
+
