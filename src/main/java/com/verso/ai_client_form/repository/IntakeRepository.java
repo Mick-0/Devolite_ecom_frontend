@@ -125,14 +125,13 @@ public class IntakeRepository {
         UUID id = projectId != null ? projectId : UUID.randomUUID();
         String sql = """
             insert into core.web_project
-                (id, company_id, project_name, project_kind, expected_outcome, source_channel, status)
+                (id, company_id, project_name, project_kind, expected_outcome, status)
             values
-                (:id, :company_id, :project_name, :project_kind, :expected_outcome, :source_channel, :status)
+                (:id, :company_id, :project_name, :project_kind, :expected_outcome, :status)
             on conflict (id) do update set
                 project_name = excluded.project_name,
                 project_kind = excluded.project_kind,
                 expected_outcome = excluded.expected_outcome,
-                source_channel = excluded.source_channel,
                 status = excluded.status
             """;
         MapSqlParameterSource params = new MapSqlParameterSource(data)
@@ -239,17 +238,15 @@ public class IntakeRepository {
     public void upsertBrandProfile(UUID projectId, Map<String, Object> data) {
         String sql = """
             insert into brand.identity_profile
-                (project_id, logo_restyle_required, logo_restyle_generated, logo_approved,
+                (project_id, logo_restyle_required,
                  primary_color, secondary_color, accent_color_1, accent_color_2,
                  font_policy, visual_asset_source, tone_of_voice)
             values
-                (:project_id, :logo_restyle_required, :logo_restyle_generated, :logo_approved,
+                (:project_id, :logo_restyle_required,
                  :primary_color, :secondary_color, :accent_color_1, :accent_color_2,
                  :font_policy, :visual_asset_source, :tone_of_voice)
             on conflict (project_id) do update set
                 logo_restyle_required = excluded.logo_restyle_required,
-                logo_restyle_generated = excluded.logo_restyle_generated,
-                logo_approved = excluded.logo_approved,
                 primary_color = excluded.primary_color,
                 secondary_color = excluded.secondary_color,
                 accent_color_1 = excluded.accent_color_1,

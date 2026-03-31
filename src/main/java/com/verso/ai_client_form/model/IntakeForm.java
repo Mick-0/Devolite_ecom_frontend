@@ -47,7 +47,6 @@ public class IntakeForm {
     @Pattern(regexp = "^(?:vetrina|ecommerce)$", message = "Seleziona un tipo di progetto valido.")
     private String projectKind;
     private String expectedOutcome;
-    private String sourceChannel;
     @Pattern(regexp = "^(?:in_discovery|onboarding|in_production|delivered|archived)?$", message = "Seleziona uno stato progetto valido.")
     private String status;
 
@@ -79,8 +78,6 @@ public class IntakeForm {
     private String legalFooterCta;
 
     private Boolean logoRestyleRequired;
-    private Boolean logoRestyleGenerated;
-    private Boolean logoApproved;
     private String primaryColor;
     private String secondaryColor;
     private String accentColor1;

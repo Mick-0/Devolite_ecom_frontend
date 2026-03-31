@@ -41,7 +41,6 @@ CREATE TABLE IF NOT EXISTS core.web_project (
     project_name TEXT NOT NULL,
     project_kind TEXT NOT NULL CHECK (project_kind IN ('vetrina', 'ecommerce')),
     expected_outcome TEXT,
-    source_channel TEXT,
     status TEXT NOT NULL DEFAULT 'in_discovery'
         CHECK (status IN ('in_discovery', 'onboarding', 'in_production', 'delivered', 'archived')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -291,8 +290,6 @@ CREATE TABLE IF NOT EXISTS brand.identity_profile (
     project_id UUID PRIMARY KEY REFERENCES core.web_project(id) ON DELETE CASCADE,
     logo_asset_id UUID REFERENCES media.asset(id) ON DELETE SET NULL,
     logo_restyle_required BOOLEAN,
-    logo_restyle_generated BOOLEAN,
-    logo_approved BOOLEAN,
     primary_color VARCHAR(16),
     secondary_color VARCHAR(16),
     accent_color_1 VARCHAR(16),

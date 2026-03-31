@@ -91,7 +91,6 @@ public class IntakeService {
             "project_name", form.getProjectName(),
             "project_kind", defaultIfBlank(form.getProjectKind(), "vetrina"),
             "expected_outcome", form.getExpectedOutcome(),
-            "source_channel", form.getSourceChannel(),
             "status", defaultIfBlank(form.getStatus(), "onboarding")
         ));
 
@@ -128,8 +127,6 @@ public class IntakeService {
 
         repo.upsertBrandProfile(projectId, map(
             "logo_restyle_required", bool(form.getLogoRestyleRequired()),
-            "logo_restyle_generated", bool(form.getLogoRestyleGenerated()),
-            "logo_approved", bool(form.getLogoApproved()),
             "primary_color", form.getPrimaryColor(),
             "secondary_color", form.getSecondaryColor(),
             "accent_color_1", form.getAccentColor1(),
@@ -305,7 +302,6 @@ public class IntakeService {
             form.setProjectName((String) row.get("project_name"));
             form.setProjectKind((String) row.get("project_kind"));
             form.setExpectedOutcome((String) row.get("expected_outcome"));
-            form.setSourceChannel((String) row.get("source_channel"));
             form.setStatus((String) row.get("status"));
         });
         if (form.getCompanyId() != null) {
@@ -372,8 +368,6 @@ public class IntakeService {
 
         repo.findBrandProfile(projectId).ifPresent(row -> {
             form.setLogoRestyleRequired(toBoolean(row.get("logo_restyle_required")));
-            form.setLogoRestyleGenerated(toBoolean(row.get("logo_restyle_generated")));
-            form.setLogoApproved(toBoolean(row.get("logo_approved")));
             form.setPrimaryColor((String) row.get("primary_color"));
             form.setSecondaryColor((String) row.get("secondary_color"));
             form.setAccentColor1((String) row.get("accent_color_1"));

@@ -199,6 +199,7 @@
     return Array.from(form.querySelectorAll('input, textarea, select'))
       .filter(field => {
         if (field.type === 'hidden') return false;
+        if (field.hasAttribute('data-skip-progress')) return false;
         if (['submit', 'reset', 'button', 'image'].includes(field.type)) return false;
         return true;
       });
@@ -594,6 +595,29 @@
       }
     });
   }
+
+  const isValidHex = (value) => /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value || '');
+  const normalizeHex = (value) => value.trim().toUpperCase();
+  const colorPickers = Array.from(form.querySelectorAll('input[type="color"][data-color-target]'));
+  colorPickers.forEach(picker => {
+    const targetName = picker.dataset.colorTarget;
+    if (!targetName) return;
+    const textInput = form.querySelector(`input[name="${targetName}"]`);
+    if (!textInput) return;
+    const syncFromPicker = () => {
+      textInput.value = normalizeHex(picker.value);
+      textInput.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    const syncFromText = () => {
+      const raw = textInput.value || '';
+      if (isValidHex(raw)) {
+        picker.value = normalizeHex(raw);
+      }
+    };
+    picker.addEventListener('input', syncFromPicker);
+    textInput.addEventListener('input', syncFromText);
+    syncFromText();
+  });
 
   const total = form.querySelector('input[name="aiSeoCreditsTotal"]');
   const used = form.querySelector('input[name="aiSeoCreditsUsed"]');

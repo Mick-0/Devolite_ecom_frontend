@@ -334,6 +334,35 @@ textarea {
   flex-direction: column;
 }
 
+.color-field .color-inputs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.color-field .color-inputs input[type="text"] {
+  flex: 1;
+}
+
+.color-field .color-inputs input[type="color"] {
+  width: 46px;
+  height: 40px;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+}
+
+.color-field .color-inputs input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-field .color-inputs input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 10px;
+}
+
 .check-row {
   display: flex;
   align-items: center;

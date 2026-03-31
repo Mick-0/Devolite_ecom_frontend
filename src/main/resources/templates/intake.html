@@ -153,7 +153,6 @@
           </div>
           <div class="grid">
             <div class="field"><label>Risultato atteso</label><input type="text" th:field="*{expectedOutcome}" placeholder="Aumentare vendite online" /></div>
-            <div class="field"><label>Canale di acquisizione</label><input type="text" th:field="*{sourceChannel}" placeholder="Segnalazione" /></div>
           </div>
         </section>
 
@@ -167,11 +166,22 @@
           <div class="grid">
             <div class="field"><label>Email</label><input type="email" th:field="*{crmEmail}" placeholder="mario.rossi@acme.it" /></div>
             <div class="field"><label>Email secondaria</label><input type="email" th:field="*{crmEmailSecondary}" placeholder="crm@acme.it" /></div>
-            <div class="field"><label>Nome lista</label><input type="text" th:field="*{crmListName}" placeholder="Lead T1" /></div>
+            <div class="field">
+              <label>Nome lista</label>
+              <select th:field="*{crmListName}">
+                <option value="">Seleziona...</option>
+                <option value="lead_t1">Lead T1</option>
+                <option value="prospect_caldo">Prospect caldi</option>
+                <option value="clienti_attivi">Clienti attivi</option>
+                <option value="inbound_sito">Inbound sito</option>
+                <option value="partner_referral">Partner referral</option>
+                <option value="altro">Altro</option>
+              </select>
+            </div>
           </div>
           <div class="grid">
-            <div class="field"><label>Nome azienda (snapshot)</label><input type="text" th:field="*{crmCompanyNameSnapshot}" placeholder="Acme Srl" /></div>
-            <div class="field"><label>Settore</label><input type="text" th:field="*{crmSector}" placeholder="Commercio al dettaglio" /></div>
+            <div class="field"><label>Nome azienda (snapshot)</label><input type="text" th:field="*{crmCompanyNameSnapshot}" placeholder="Acme" /></div>
+            <div class="field"><label>Settore</label><input type="text" th:field="*{crmSector}" placeholder="Retail fashion" /></div>
           </div>
           <div class="grid">
             <div class="field"><label>Temperatura interesse</label><input type="text" th:field="*{crmInterestTemperature}" placeholder="Caldo" /></div>
@@ -222,12 +232,36 @@
         <section id="brand" class="card">
           <h3>Marchio</h3>
           <div class="grid">
-            <div class="field"><label>Colore primario</label><input type="text" th:field="*{primaryColor}" placeholder="#0f766e" pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" title="Inserisci un colore esadecimale (#RGB o #RRGGBB)" /></div>
-            <div class="field"><label>Colore secondario</label><input type="text" th:field="*{secondaryColor}" placeholder="#c05621" pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" title="Inserisci un colore esadecimale (#RGB o #RRGGBB)" /></div>
-            <div class="field"><label>Colore accento 1</label><input type="text" th:field="*{accentColor1}" placeholder="#f59e0b" pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" title="Inserisci un colore esadecimale (#RGB o #RRGGBB)" /></div>
+            <div class="field color-field">
+              <label>Colore primario</label>
+              <div class="color-inputs">
+                <input type="text" th:field="*{primaryColor}" placeholder="#0f766e" pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" title="Inserisci un colore esadecimale (#RGB o #RRGGBB)" data-color-hex="primaryColor" />
+                <input type="color" class="color-picker" value="#443877" data-color-target="primaryColor" data-skip-progress />
+              </div>
+            </div>
+            <div class="field color-field">
+              <label>Colore secondario</label>
+              <div class="color-inputs">
+                <input type="text" th:field="*{secondaryColor}" placeholder="#c05621" pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" title="Inserisci un colore esadecimale (#RGB o #RRGGBB)" data-color-hex="secondaryColor" />
+                <input type="color" class="color-picker" value="#7d6eb0" data-color-target="secondaryColor" data-skip-progress />
+              </div>
+            </div>
+            <div class="field color-field">
+              <label>Colore accento 1</label>
+              <div class="color-inputs">
+                <input type="text" th:field="*{accentColor1}" placeholder="#f59e0b" pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" title="Inserisci un colore esadecimale (#RGB o #RRGGBB)" data-color-hex="accentColor1" />
+                <input type="color" class="color-picker" value="#ffd4da" data-color-target="accentColor1" data-skip-progress />
+              </div>
+            </div>
           </div>
           <div class="grid">
-            <div class="field"><label>Colore accento 2</label><input type="text" th:field="*{accentColor2}" placeholder="#10b981" pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" title="Inserisci un colore esadecimale (#RGB o #RRGGBB)" /></div>
+            <div class="field color-field">
+              <label>Colore accento 2</label>
+              <div class="color-inputs">
+                <input type="text" th:field="*{accentColor2}" placeholder="#10b981" pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" title="Inserisci un colore esadecimale (#RGB o #RRGGBB)" data-color-hex="accentColor2" />
+                <input type="color" class="color-picker" value="#443877" data-color-target="accentColor2" data-skip-progress />
+              </div>
+            </div>
             <div class="field">
               <label>Policy font</label>
               <select th:field="*{fontPolicy}">
@@ -261,8 +295,6 @@
           </div>
           <div class="grid">
             <label class="check-row"><input type="checkbox" th:field="*{logoRestyleRequired}" /> Restyling richiesto</label>
-            <label class="check-row"><input type="checkbox" th:field="*{logoRestyleGenerated}" /> Restyling generato</label>
-            <label class="check-row"><input type="checkbox" th:field="*{logoApproved}" /> Logo approvato</label>
           </div>
         </section>
 
