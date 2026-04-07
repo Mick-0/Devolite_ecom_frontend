@@ -69,7 +69,7 @@ public class HttpsEnforcementFilter extends OncePerRequestFilter {
         String query = request.getQueryString();
         String target = "https://" + host + uri + (query != null ? "?" + query : "");
 
-        response.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY);
+        response.setStatus(HttpServletResponse.SC_PERMANENT_REDIRECT);
         response.setHeader("Location", target);
     }
 }

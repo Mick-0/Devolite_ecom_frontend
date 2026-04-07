@@ -32,6 +32,17 @@ public class StorageService {
         }
     }
 
+    public void delete(String relativePath) {
+        if (relativePath == null || relativePath.isBlank()) {
+            return;
+        }
+        Path target = Paths.get(storageRoot).resolve(relativePath);
+        try {
+            Files.deleteIfExists(target);
+        } catch (IOException ignored) {
+        }
+    }
+
     public record StoredFile(String originalName, String relativePath, String mimeType, long sizeBytes) {}
 }
 

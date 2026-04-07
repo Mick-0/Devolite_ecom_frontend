@@ -10,6 +10,8 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 import com.verso.ai_client_form.repository.IntakeRepository;
 import com.verso.ai_client_form.repository.StaffUserRepository;
@@ -55,11 +57,14 @@ public class IntakeService {
     public UUID save(IntakeForm form, String username) {
         UUID staffUserId = ensureStaffUser(username);
 
+        String normalizedVat = emptyToNull(form.getVatNumber());
+        form.setVatNumber(normalizedVat);
+
         UUID companyId = form.getCompanyId();
         if (companyId == null) {
-            companyId = repo.findCompanyIdByVat(form.getVatNumber()).orElse(null);
+            companyId = repo.findCompanyIdByVat(normalizedVat).orElse(null);
         }
-        companyId = repo.upsertCompany(companyId, form.getLegalName(), form.getIndustry(), form.getVatNumber());
+        companyId = repo.upsertCompany(companyId, form.getLegalName(), form.getIndustry(), normalizedVat);
 
         repo.upsertCompanyProfile(companyId, map(
             "street", form.getStreet(),
@@ -70,7 +75,8 @@ public class IntakeService {
             "category", form.getCategory(),
             "founder_years", form.getFounderYears(),
             "annual_revenue", form.getAnnualRevenue(),
-            "referral_source", form.getReferralSource()
+            "referral_source", form.getReferralSource(),
+            "has_physical_store", bool(form.getHasPhysicalStore())
         ));
 
         repo.upsertPrimaryContact(companyId, map(
@@ -105,7 +111,7 @@ public class IntakeService {
             "list_name", form.getCrmListName(),
             "company_name_snapshot", form.getCrmCompanyNameSnapshot(),
             "sector", form.getCrmSector(),
-            "vat_number", form.getVatNumber(),
+            "vat_number", normalizedVat,
             "notes", form.getCrmNotes(),
             "interest_temperature", form.getCrmInterestTemperature(),
             "first_call_date", form.getCrmFirstCallDate(),
@@ -115,8 +121,8 @@ public class IntakeService {
         ), staffUserId);
 
         repo.upsertLegalProfile(projectId, map(
-            "legal_support_mode", form.getLegalSupportMode(),
-            "vat_number", form.getVatNumber(),
+            "legal_support_mode", emptyToNull(form.getLegalSupportMode()),
+            "vat_number", normalizedVat,
             "rea_number", form.getLegalReaNumber(),
             "share_capital", form.getLegalShareCapital(),
             "pec_email", form.getLegalPecEmail(),
@@ -127,13 +133,13 @@ public class IntakeService {
 
         repo.upsertBrandProfile(projectId, map(
             "logo_restyle_required", bool(form.getLogoRestyleRequired()),
-            "primary_color", form.getPrimaryColor(),
-            "secondary_color", form.getSecondaryColor(),
-            "accent_color_1", form.getAccentColor1(),
-            "accent_color_2", form.getAccentColor2(),
-            "font_policy", form.getFontPolicy(),
-            "visual_asset_source", form.getVisualAssetSource(),
-            "tone_of_voice", form.getToneOfVoice()
+            "primary_color", emptyToNull(form.getPrimaryColor()),
+            "secondary_color", emptyToNull(form.getSecondaryColor()),
+            "accent_color_1", emptyToNull(form.getAccentColor1()),
+            "accent_color_2", emptyToNull(form.getAccentColor2()),
+            "font_policy", emptyToNull(form.getFontPolicy()),
+            "visual_asset_source", emptyToNull(form.getVisualAssetSource()),
+            "tone_of_voice", emptyToNull(form.getToneOfVoice())
         ));
 
         repo.upsertMarketingProfile(projectId, map(
@@ -158,8 +164,10 @@ public class IntakeService {
             "needs_contact_form", bool(form.getNeedsContactForm()),
             "needs_external_links", bool(form.getNeedsExternalLinks()),
             "contact_form_email", form.getContactFormEmail(),
-            "copy_mode", form.getCopyMode(),
-            "page_test_status", form.getPageTestStatus()
+            "copy_mode", emptyToNull(form.getCopyMode()),
+            "page_test_status", emptyToNull(form.getPageTestStatus()),
+            "has_existing_ecommerce", bool(form.getHasExistingEcommerce()),
+            "existing_ecommerce_url", emptyToNull(form.getExistingEcommerceUrl())
         ));
 
         repo.upsertDomainSetup(projectId, map(
@@ -169,7 +177,7 @@ public class IntakeService {
             "domain_purchase_started_at", form.getDomainPurchaseStartedAt(),
             "domain_purchase_completed_at", form.getDomainPurchaseCompletedAt(),
             "preferred_mailbox", form.getPreferredMailbox(),
-            "mailbox_mode", form.getMailboxMode()
+            "mailbox_mode", emptyToNull(form.getMailboxMode())
         ));
 
         repo.upsertGoogleBusiness(projectId, map(
@@ -181,7 +189,7 @@ public class IntakeService {
         repo.replaceKeywords(projectId, parseList(form.getGbKeywords()));
 
         repo.upsertOrderAdministration(projectId, map(
-            "purchased_service", form.getPurchasedService(),
+            "purchased_service", emptyToNull(form.getPurchasedService()),
             "payment_received", bool(form.getPaymentReceived()),
             "paid_amount", form.getPaidAmount(),
             "payment_marked_at", form.getPaymentMarkedAt(),
@@ -194,27 +202,44 @@ public class IntakeService {
             repo.upsertContract(projectId, map(
                 "contact_name", form.getContractContactName(),
                 "contact_email", form.getContractContactEmail(),
-                "status", defaultIfBlank(form.getContractStatus(), "bozza"),
-                "sent_at", form.getContractSentAt(),
-                "signed_at", form.getContractSignedAt()
-            ));
+            "status", defaultIfBlank(emptyToNull(form.getContractStatus()), "bozza"),
+            "sent_at", form.getContractSentAt(),
+            "signed_at", form.getContractSignedAt()
+        ));
         }
 
+        Integer seoTotal = defaultInt(form.getAiSeoCreditsTotal(), 0);
+        Integer seoUsed = defaultInt(form.getAiSeoCreditsUsed(), 0);
+        if (seoTotal < 0) {
+            seoTotal = 0;
+        }
+        if (seoUsed < 0) {
+            seoUsed = 0;
+        }
+        if (seoUsed > seoTotal) {
+            seoUsed = seoTotal;
+        }
         repo.upsertAiSettings(projectId, map(
             "initial_analysis_started_at", form.getAiInitialAnalysisStartedAt(),
             "content_research_enabled", bool(form.getAiContentResearchEnabled()),
             "seo_indexing_enabled", bool(form.getAiSeoIndexingEnabled()),
-            "seo_credits_total", form.getAiSeoCreditsTotal(),
-            "seo_credits_used", form.getAiSeoCreditsUsed()
+            "seo_credits_total", seoTotal,
+            "seo_credits_used", seoUsed
         ));
 
         if ("ecommerce".equalsIgnoreCase(form.getProjectKind())) {
+            Integer productCount = form.getProductCount();
+            if (productCount != null && productCount < 0) {
+                productCount = 0;
+            }
             repo.upsertStoreSetup(projectId, map(
                 "purchase_enabled", bool(form.getPurchaseEnabled()),
                 "auto_renewal_enabled", bool(form.getAutoRenewalEnabled()),
                 "rid_enabled", bool(form.getRidEnabled()),
                 "csv_import_enabled", bool(form.getCsvImportEnabled()),
-                "csv_import_instructions_sent_at", form.getCsvImportInstructionsSentAt()
+                "csv_import_instructions_sent_at", form.getCsvImportInstructionsSentAt(),
+                "product_count", productCount,
+                "has_product_variants", bool(form.getProductHasVariants())
             ));
             repo.replacePaymentMethods(projectId, nullToEmpty(form.getPaymentMethods()));
             repo.replaceCarriers(projectId, nullToEmpty(form.getCarriers()));
@@ -320,6 +345,7 @@ public class IntakeService {
                 form.setFounderYears(toInteger(row.get("founder_years")));
                 form.setAnnualRevenue((java.math.BigDecimal) row.get("annual_revenue"));
                 form.setReferralSource((String) row.get("referral_source"));
+                form.setHasPhysicalStore(toBoolean(row.get("has_physical_store")));
             });
             repo.findPrimaryContact(form.getCompanyId()).ifPresent(row -> {
                 form.setContactFullName((String) row.get("full_name"));
@@ -400,6 +426,8 @@ public class IntakeService {
             form.setContactFormEmail((String) row.get("contact_form_email"));
             form.setCopyMode((String) row.get("copy_mode"));
             form.setPageTestStatus((String) row.get("page_test_status"));
+            form.setHasExistingEcommerce(toBoolean(row.get("has_existing_ecommerce")));
+            form.setExistingEcommerceUrl((String) row.get("existing_ecommerce_url"));
         });
 
         repo.findDomainSetup(projectId).ifPresent(row -> {
@@ -451,6 +479,8 @@ public class IntakeService {
             form.setRidEnabled(toBoolean(row.get("rid_enabled")));
             form.setCsvImportEnabled(toBoolean(row.get("csv_import_enabled")));
             form.setCsvImportInstructionsSentAt(toLocalDateTime(row.get("csv_import_instructions_sent_at")));
+            form.setProductCount(toInteger(row.get("product_count")));
+            form.setProductHasVariants(toBoolean(row.get("has_product_variants")));
         });
         form.setPaymentMethods(repo.findPaymentMethods(projectId));
         form.setCarriers(repo.findCarriers(projectId));
@@ -464,6 +494,7 @@ public class IntakeService {
             return;
         }
         StorageService.StoredFile stored = storageService.store(projectId, file);
+        registerRollbackCleanup(stored.relativePath());
         repo.insertAsset(
             projectId,
             category,
@@ -475,6 +506,20 @@ public class IntakeService {
             comment,
             staffUserId
         );
+    }
+
+    private void registerRollbackCleanup(String relativePath) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
+                    storageService.delete(relativePath);
+                }
+            }
+        });
     }
 
     private List<String> parseList(String input) {
@@ -505,6 +550,10 @@ public class IntakeService {
 
     private String emptyToNull(String s) {
         return (s == null || s.isBlank()) ? null : s;
+    }
+
+    private Integer defaultInt(Integer value, int fallback) {
+        return value == null ? fallback : value;
     }
 
     private java.time.LocalDate toLocalDate(Object value) {

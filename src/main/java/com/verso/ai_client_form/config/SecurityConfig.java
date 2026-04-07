@@ -20,7 +20,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/css/**", "/js/**", "/static/**", "/assets/**", "/favicon.ico", "/login", "/error").permitAll()
+                .requestMatchers("/css/**", "/js/**", "/static/**", "/assets/**", "/favicon.ico", "/favicon_io/**", "/login", "/error").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 .anyRequest().authenticated()
             )

@@ -22,6 +22,7 @@ import com.verso.ai_client_form.model.IntakeForm;
 import com.verso.ai_client_form.model.ProjectSummary;
 import com.verso.ai_client_form.service.IntakeService;
 import jakarta.validation.Valid;
+import org.springframework.web.multipart.MultipartFile;
 
 @Controller
 public class IntakeController {
@@ -101,13 +102,83 @@ public class IntakeController {
     public String submit(@Valid @ModelAttribute("form") IntakeForm form,
                          BindingResult bindingResult,
                          Principal principal,
+                         Model model,
                          RedirectAttributes redirectAttributes) {
+        validateFiles(form, bindingResult);
         if (bindingResult.hasErrors()) {
+            model.addAttribute("confirmedSections", intakeService.loadConfirmedSections(form.getDraftId()));
+            model.addAttribute("enforceSectionLock", intakeService.isEnforceSectionOrder());
             return "intake";
         }
-        UUID projectId = intakeService.save(form, principal.getName());
-        redirectAttributes.addFlashAttribute("saved", true);
-        return "redirect:/intake?projectId=" + projectId;
+        try {
+            UUID projectId = intakeService.save(form, principal.getName());
+            redirectAttributes.addFlashAttribute("saved", true);
+            return "redirect:/intake?projectId=" + projectId;
+        } catch (org.springframework.dao.DuplicateKeyException ex) {
+            bindingResult.rejectValue("projectName", "projectName.duplicate", "Esiste già un progetto con questo nome.");
+            model.addAttribute("confirmedSections", intakeService.loadConfirmedSections(form.getDraftId()));
+            model.addAttribute("enforceSectionLock", intakeService.isEnforceSectionOrder());
+            return "intake";
+        }
+    }
+
+    private void validateFiles(IntakeForm form, BindingResult bindingResult) {
+        if (form == null) {
+            return;
+        }
+        validateFile(
+            form.getLogoFile(),
+            "logoFile",
+            Set.of("image/png", "image/jpeg", "image/svg+xml", "image/webp"),
+            Set.of("png", "jpg", "jpeg", "svg", "webp"),
+            "Formato logo non valido. Usa PNG, JPG, SVG o WebP.",
+            bindingResult
+        );
+        validateFile(
+            form.getVisuraFile(),
+            "visuraFile",
+            Set.of("application/pdf"),
+            Set.of("pdf"),
+            "La visura deve essere in PDF.",
+            bindingResult
+        );
+        validateFile(
+            form.getContractFile(),
+            "contractFile",
+            Set.of("application/pdf"),
+            Set.of("pdf"),
+            "Il contratto deve essere in PDF.",
+            bindingResult
+        );
+    }
+
+    private void validateFile(MultipartFile file,
+                              String fieldName,
+                              Set<String> allowedMimeTypes,
+                              Set<String> allowedExtensions,
+                              String message,
+                              BindingResult bindingResult) {
+        if (file == null || file.isEmpty()) {
+            return;
+        }
+        String contentType = file.getContentType();
+        boolean typeOk = contentType != null && allowedMimeTypes.contains(contentType.toLowerCase());
+        boolean extOk = hasAllowedExtension(file.getOriginalFilename(), allowedExtensions);
+        if (!typeOk && !extOk) {
+            bindingResult.rejectValue(fieldName, "file.invalid", message);
+        }
+    }
+
+    private boolean hasAllowedExtension(String filename, Set<String> allowedExtensions) {
+        if (filename == null || filename.isBlank()) {
+            return false;
+        }
+        int idx = filename.lastIndexOf('.');
+        if (idx < 0 || idx == filename.length() - 1) {
+            return false;
+        }
+        String ext = filename.substring(idx + 1).toLowerCase();
+        return allowedExtensions.contains(ext);
     }
 
     @PostMapping(path = "/intake/section/confirm", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -116,6 +187,16 @@ public class IntakeController {
                                                               Principal principal) {
         if (request == null || request.sectionKey == null || request.sectionKey.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "sectionKey required"));
+        }
+        if ("project".equals(request.sectionKey)) {
+            String name = request.projectName == null ? "" : request.projectName.trim();
+            if (name.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Inserisci il nome progetto prima di confermare."));
+            }
+            UUID existing = intakeService.findProjectIdByName(name);
+            if (existing != null && (request.projectId == null || !existing.equals(request.projectId))) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Esiste già un progetto con questo nome. Usa \"Modifica scheda esistente\" per aggiornarlo."));
+            }
         }
         try {
             UUID draftId = intakeService.getOrCreateDraft(request.draftId, request.projectId);
@@ -147,6 +228,7 @@ public class IntakeController {
         public UUID draftId;
         public UUID projectId;
         public String sectionKey;
+        public String projectName;
     }
 }
 

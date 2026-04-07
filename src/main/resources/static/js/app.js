@@ -238,6 +238,7 @@
     const total = fields.length;
     const completed = fields.reduce((acc, field) => acc + (isCompleted(field) ? 1 : 0), 0);
     const percent = total ? Math.round((completed / total) * 100) : 0;
+    updateFieldCompletion(fields);
     progressTargets.forEach(({ el, valueEl, fillEl }) => {
       if (valueEl) {
         valueEl.textContent = `${percent}% (${completed}/${total})`;
@@ -246,6 +247,16 @@
         fillEl.style.width = `${percent}%`;
       }
       el.setAttribute('aria-valuenow', String(percent));
+    });
+  };
+
+  const updateFieldCompletion = (fields) => {
+    if (!fields) return;
+    fields.forEach(field => {
+      if (field.hasAttribute('data-skip-progress')) return;
+      const wrapper = field.closest('.field') || field.closest('.check-row') || field.closest('.pill');
+      if (!wrapper) return;
+      wrapper.classList.toggle('field-complete', isCompleted(field));
     });
   };
 
@@ -417,10 +428,24 @@
           'Content-Type': 'application/json',
           [csrfHeader]: csrfToken
         },
-        body: JSON.stringify({ draftId, projectId, sectionKey: section.id })
+        body: JSON.stringify({
+          draftId,
+          projectId,
+          sectionKey: section.id,
+          projectName: form?.querySelector('input[name="projectName"]')?.value?.trim() || null
+        })
       });
       if (!response.ok) {
-        throw new Error('confirm failed');
+        let message = 'Errore nel salvataggio della conferma. Riprova.';
+        try {
+          const payload = await response.json();
+          if (payload && payload.error) {
+            message = payload.error;
+          }
+        } catch (err) {
+          // ignore parsing errors
+        }
+        throw new Error(message);
       }
       const data = await response.json();
       if (data.draftId && draftIdInput) {
@@ -435,7 +460,7 @@
     } catch (err) {
       const alert = section.querySelector('.section-alert');
       if (alert) {
-        alert.textContent = 'Errore nel salvataggio della conferma. Riprova.';
+        alert.textContent = err?.message || 'Errore nel salvataggio della conferma. Riprova.';
         alert.hidden = false;
       }
     }

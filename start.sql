@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS anagrafica.company_profile (
     founder_years INTEGER CHECK (founder_years IS NULL OR founder_years >= 0),
     annual_revenue NUMERIC(15, 2) CHECK (annual_revenue IS NULL OR annual_revenue >= 0),
     referral_source TEXT,
+    has_physical_store BOOLEAN,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -364,6 +365,8 @@ CREATE TABLE IF NOT EXISTS sito.site_brief (
     copy_mode TEXT CHECK (copy_mode IN ('scrivi_cliente', 'genera_ai', 'misto')),
     page_test_status TEXT
         CHECK (page_test_status IN ('non_iniziato', 'in_test', 'completato')),
+    has_existing_ecommerce BOOLEAN,
+    existing_ecommerce_url TEXT,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -536,6 +539,8 @@ CREATE TABLE IF NOT EXISTS ecommerce.store_setup (
     rid_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     csv_import_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     csv_import_instructions_sent_at TIMESTAMPTZ,
+    product_count INTEGER,
+    has_product_variants BOOLEAN,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

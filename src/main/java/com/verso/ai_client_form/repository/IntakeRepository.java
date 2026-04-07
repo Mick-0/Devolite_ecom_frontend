@@ -64,10 +64,10 @@ public class IntakeRepository {
         String sql = """
             insert into anagrafica.company_profile
                 (company_id, street, city, province, postal_code, country_code, category,
-                 founder_years, annual_revenue, referral_source)
+                 founder_years, annual_revenue, referral_source, has_physical_store)
             values
                 (:company_id, :street, :city, :province, :postal_code, :country_code, :category,
-                 :founder_years, :annual_revenue, :referral_source)
+                 :founder_years, :annual_revenue, :referral_source, :has_physical_store)
             on conflict (company_id) do update set
                 street = excluded.street,
                 city = excluded.city,
@@ -77,7 +77,8 @@ public class IntakeRepository {
                 category = excluded.category,
                 founder_years = excluded.founder_years,
                 annual_revenue = excluded.annual_revenue,
-                referral_source = excluded.referral_source
+                referral_source = excluded.referral_source,
+                has_physical_store = excluded.has_physical_store
             """;
         MapSqlParameterSource params = new MapSqlParameterSource(data).addValue("company_id", companyId);
         jdbc.update(sql, params);
@@ -327,11 +328,13 @@ public class IntakeRepository {
             insert into sito.site_brief
                 (project_id, inspiration_sites, requested_menu, needs_about_page,
                  needs_where_page, needs_services_page, needs_contact_form,
-                 needs_external_links, contact_form_email, copy_mode, page_test_status)
+                 needs_external_links, contact_form_email, copy_mode, page_test_status,
+                 has_existing_ecommerce, existing_ecommerce_url)
             values
                 (:project_id, :inspiration_sites, :requested_menu, :needs_about_page,
                  :needs_where_page, :needs_services_page, :needs_contact_form,
-                 :needs_external_links, :contact_form_email, :copy_mode, :page_test_status)
+                 :needs_external_links, :contact_form_email, :copy_mode, :page_test_status,
+                 :has_existing_ecommerce, :existing_ecommerce_url)
             on conflict (project_id) do update set
                 inspiration_sites = excluded.inspiration_sites,
                 requested_menu = excluded.requested_menu,
@@ -342,7 +345,9 @@ public class IntakeRepository {
                 needs_external_links = excluded.needs_external_links,
                 contact_form_email = excluded.contact_form_email,
                 copy_mode = excluded.copy_mode,
-                page_test_status = excluded.page_test_status
+                page_test_status = excluded.page_test_status,
+                has_existing_ecommerce = excluded.has_existing_ecommerce,
+                existing_ecommerce_url = excluded.existing_ecommerce_url
             """;
         jdbc.update(sql, new MapSqlParameterSource(data).addValue("project_id", projectId));
     }
@@ -479,16 +484,20 @@ public class IntakeRepository {
         String sql = """
             insert into ecommerce.store_setup
                 (project_id, purchase_enabled, auto_renewal_enabled, rid_enabled,
-                 csv_import_enabled, csv_import_instructions_sent_at)
+                 csv_import_enabled, csv_import_instructions_sent_at,
+                 product_count, has_product_variants)
             values
                 (:project_id, :purchase_enabled, :auto_renewal_enabled, :rid_enabled,
-                 :csv_import_enabled, :csv_import_instructions_sent_at)
+                 :csv_import_enabled, :csv_import_instructions_sent_at,
+                 :product_count, :has_product_variants)
             on conflict (project_id) do update set
                 purchase_enabled = excluded.purchase_enabled,
                 auto_renewal_enabled = excluded.auto_renewal_enabled,
                 rid_enabled = excluded.rid_enabled,
                 csv_import_enabled = excluded.csv_import_enabled,
-                csv_import_instructions_sent_at = excluded.csv_import_instructions_sent_at
+                csv_import_instructions_sent_at = excluded.csv_import_instructions_sent_at,
+                product_count = excluded.product_count,
+                has_product_variants = excluded.has_product_variants
             """;
         jdbc.update(sql, new MapSqlParameterSource(data).addValue("project_id", projectId));
     }

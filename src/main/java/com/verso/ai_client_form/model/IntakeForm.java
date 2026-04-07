@@ -32,7 +32,9 @@ public class IntakeForm {
     private Integer founderYears;
     private BigDecimal annualRevenue;
     private String referralSource;
+    private Boolean hasPhysicalStore;
 
+    @NotBlank(message = "Inserisci il nome completo del referente.")
     private String contactFullName;
     private String contactPhone;
     private String contactPhoneSecondary;
@@ -111,6 +113,8 @@ public class IntakeForm {
     private String copyMode;
     @Pattern(regexp = "^(?:non_iniziato|in_test|completato)?$", message = "Seleziona uno stato test valido.")
     private String pageTestStatus;
+    private Boolean hasExistingEcommerce;
+    private String existingEcommerceUrl;
 
     private Boolean hasExistingDomain;
     private String existingDomain;
@@ -160,6 +164,8 @@ public class IntakeForm {
     private Boolean csvImportEnabled;
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private LocalDateTime csvImportInstructionsSentAt;
+    private Integer productCount;
+    private Boolean productHasVariants;
     private List<String> paymentMethods;
     private List<String> carriers;
     private String productCategories;
