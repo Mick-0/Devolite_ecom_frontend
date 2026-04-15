@@ -34,12 +34,13 @@
         <a href="#legal" data-section="legal"><span class="nav-indicator"></span><span class="nav-title">Legale</span></a>
         <a href="#brand" data-section="brand"><span class="nav-indicator"></span><span class="nav-title">Marchio</span></a>
         <a href="#marketing" data-section="marketing"><span class="nav-indicator"></span><span class="nav-title">Marketing</span></a>
-        <a href="#site" data-section="site"><span class="nav-indicator"></span><span class="nav-title">Brief Sito</span></a>
+        <a href="#vetrina" data-section="vetrina" data-applicable="vetrina"><span class="nav-indicator"></span><span class="nav-title">Vetrina</span></a>
+        <a href="#site" data-section="site" data-applicable="ecommerce"><span class="nav-indicator"></span><span class="nav-title">Brief e-commerce</span></a>
         <a href="#domain" data-section="domain"><span class="nav-indicator"></span><span class="nav-title">Dominio</span></a>
         <a href="#local" data-section="local"><span class="nav-indicator"></span><span class="nav-title">Attività Locale</span></a>
         <a href="#commercial" data-section="commercial"><span class="nav-indicator"></span><span class="nav-title">Commerciale</span></a>
         <a href="#ai" data-section="ai"><span class="nav-indicator"></span><span class="nav-title">IA</span></a>
-        <a href="#ecommerce" data-section="ecommerce"><span class="nav-indicator"></span><span class="nav-title">E-commerce</span></a>
+        <a href="#ecommerce" data-section="ecommerce" data-applicable="ecommerce"><span class="nav-indicator"></span><span class="nav-title">E-commerce</span></a>
         <a href="#files" data-section="files"><span class="nav-indicator"></span><span class="nav-title">File</span></a>
       </nav>
     </aside>
@@ -348,27 +349,72 @@
           </div>
         </section>
 
-        <section id="site" class="card">
-          <h3>Brief Sito</h3>
+        <section id="vetrina" class="card" data-applicable="vetrina">
+          <h3>Vetrina</h3>
+          <div class="grid">
+            <div class="field">
+              <label>Obiettivo del sito</label>
+              <select th:field="*{showcaseGoal}">
+                <option value="">Seleziona...</option>
+                <option value="presentazione_azienda">Presentazione aziendale</option>
+                <option value="raccolta_contatti">Raccolta contatti</option>
+                <option value="richiesta_preventivi">Richiesta preventivi</option>
+                <option value="prenotazioni">Prenotazioni</option>
+                <option value="download_brochure">Download brochure</option>
+                <option value="supporto_commerciale">Supporto commerciale</option>
+              </select>
+            </div>
+            <div class="field"><label>Numero pagine</label><input type="number" th:field="*{showcasePageCount}" placeholder="6" min="0" /></div>
+            <div class="field">
+              <label>CTA principale</label>
+              <select th:field="*{showcasePrimaryCta}">
+                <option value="">Seleziona...</option>
+                <option value="contattaci">Contattaci</option>
+                <option value="richiedi_preventivo">Richiedi preventivo</option>
+                <option value="prenota_chiamata">Prenota una chiamata</option>
+                <option value="vieni_in_sede">Vieni in sede</option>
+                <option value="scarica_brochure">Scarica brochure</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid-1">
+            <div class="field"><label>Pagine richieste</label><textarea th:field="*{showcaseRequestedPages}" placeholder="Home&#10;Chi siamo&#10;Servizi&#10;Portfolio&#10;Contatti"></textarea></div>
+            <div class="field"><label>Struttura homepage</label><textarea th:field="*{showcaseHomepageSections}" placeholder="Hero iniziale&#10;Servizi principali&#10;Numeri chiave&#10;Testimonianze&#10;CTA finale"></textarea></div>
+          </div>
+          <div class="grid">
+            <label class="check-row"><input type="checkbox" th:field="*{showcaseNeedsAboutPage}" /> Pagina chi siamo</label>
+            <label class="check-row"><input type="checkbox" th:field="*{showcaseNeedsWherePage}" /> Pagina dove siamo</label>
+            <label class="check-row"><input type="checkbox" th:field="*{showcaseNeedsServicesPage}" /> Pagina servizi</label>
+          </div>
+          <div class="grid">
+            <label class="check-row"><input type="checkbox" th:field="*{showcaseNeedsContactForm}" /> Modulo contatti</label>
+            <label class="check-row"><input type="checkbox" th:field="*{showcaseNeedsExternalLinks}" /> Link esterni</label>
+            <label class="check-row"><input type="checkbox" th:field="*{showcaseHasPortfolio}" /> Portfolio o case study</label>
+          </div>
+          <div class="grid">
+            <label class="check-row"><input type="checkbox" th:field="*{showcaseHasTestimonials}" /> Testimonianze</label>
+            <label class="check-row"><input type="checkbox" th:field="*{showcaseHasFaq}" /> FAQ</label>
+            <label class="check-row"><input type="checkbox" th:field="*{showcaseHasBrochure}" /> Brochure o catalogo PDF</label>
+          </div>
+          <div class="grid">
+            <label class="check-row"><input type="checkbox" th:field="*{showcaseHasBlog}" /> Blog o news</label>
+            <div class="field"><label>Email modulo contatti</label><input type="email" th:field="*{showcaseContactFormEmail}" placeholder="contatti@acme.it" /></div>
+            <label class="check-row"><input type="checkbox" th:field="*{showcaseHasSeparateShop}" /> Ha già uno shop online separato?</label>
+          </div>
+          <div class="grid-1">
+            <div class="field"><label>URL shop online separato</label><input type="text" th:field="*{showcaseSeparateShopUrl}" placeholder="https://shop.acme.it" /></div>
+          </div>
+        </section>
+
+        <section id="site" class="card" data-applicable="ecommerce">
+          <h3>Brief e-commerce</h3>
           <div class="grid-1">
             <div class="field"><label>Siti di ispirazione</label><textarea th:field="*{inspirationSites}" placeholder="https://example.com&#10;https://brand.com"></textarea></div>
-            <div class="field"><label>Menu richiesto</label><textarea th:field="*{requestedMenu}" placeholder="Home&#10;Shop&#10;Chi siamo&#10;Contatti"></textarea></div>
+            <div class="field"><label>Menu shop richiesto</label><textarea th:field="*{requestedMenu}" placeholder="Home&#10;Shop&#10;Chi siamo&#10;Contatti&#10;Carrello"></textarea></div>
           </div>
           <div class="grid">
-            <label class="check-row"><input type="checkbox" th:field="*{needsAboutPage}" /> Pagina chi siamo</label>
-            <label class="check-row"><input type="checkbox" th:field="*{needsWherePage}" /> Pagina dove siamo</label>
-            <label class="check-row"><input type="checkbox" th:field="*{needsServicesPage}" /> Pagina servizi</label>
-          </div>
-          <div class="grid">
-            <label class="check-row"><input type="checkbox" th:field="*{needsContactForm}" /> Modulo contatti</label>
-            <label class="check-row"><input type="checkbox" th:field="*{needsExternalLinks}" /> Link esterni</label>
-          </div>
-          <div class="grid">
-            <div class="field"><label>Email modulo contatti</label><input type="email" th:field="*{contactFormEmail}" placeholder="contatti@acme.it" /></div>
             <label class="check-row"><input type="checkbox" th:field="*{hasExistingEcommerce}" /> Ha già un e-commerce</label>
             <div class="field"><label>Sito e-commerce esistente</label><input type="text" th:field="*{existingEcommerceUrl}" placeholder="https://shop.acme.it" /></div>
-          </div>
-          <div class="grid">
             <div class="field">
               <label>Modalità testi</label>
               <select th:field="*{copyMode}">
@@ -378,6 +424,8 @@
                 <option value="misto">Misto</option>
               </select>
             </div>
+          </div>
+          <div class="grid">
             <div class="field">
               <label>Stato test pagine</label>
               <select th:field="*{pageTestStatus}">
@@ -481,7 +529,7 @@
           </div>
         </section>
 
-        <section id="ecommerce" class="card">
+        <section id="ecommerce" class="card" data-applicable="ecommerce">
           <h3>E-commerce</h3>
           <div class="grid">
             <label class="check-row"><input type="checkbox" th:field="*{purchaseEnabled}" /> Acquisti abilitati</label>
@@ -553,10 +601,30 @@
             <h3 id="existingProjectTitle">Modifica form esistente</h3>
             <button type="button" class="icon-button" data-modal-close aria-label="Chiudi">&times;</button>
           </div>
-          <p class="modal-subtitle">Seleziona un progetto recente o cerca per nome.</p>
+          <p class="modal-subtitle">Cerca per progetto, azienda, referente, email, partita IVA o citta e ordina la lista come preferisci.</p>
           <div class="modal-search">
-            <input type="text" data-project-search placeholder="Cerca per nome progetto" />
+            <input type="text" data-project-search placeholder="Cerca per progetto, azienda, referente, email, P.IVA o citta" />
             <button type="button" class="secondary" data-project-open>Apri</button>
+          </div>
+          <div class="modal-filters">
+            <div class="field">
+              <label for="projectSortBy">Ordina per</label>
+              <select id="projectSortBy" data-project-sort-by>
+                <option value="updatedAt">Ultimo aggiornamento</option>
+                <option value="projectName">Nome progetto</option>
+                <option value="companyName">Azienda</option>
+                <option value="projectStatus">Stato</option>
+                <option value="projectKind">Tipo progetto</option>
+                <option value="city">Citta</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="projectSortDir">Direzione</label>
+              <select id="projectSortDir" data-project-sort-dir>
+                <option value="desc">Decrescente</option>
+                <option value="asc">Crescente</option>
+              </select>
+            </div>
           </div>
           <div class="modal-status" data-project-status></div>
           <div class="modal-list" data-project-list>

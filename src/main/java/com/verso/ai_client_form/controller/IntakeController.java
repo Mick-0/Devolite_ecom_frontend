@@ -17,12 +17,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import com.verso.ai_client_form.model.IntakeForm;
 import com.verso.ai_client_form.model.ProjectSummary;
 import com.verso.ai_client_form.service.IntakeService;
 import jakarta.validation.Valid;
-import org.springframework.web.multipart.MultipartFile;
 
 @Controller
 public class IntakeController {
@@ -94,10 +94,14 @@ public class IntakeController {
 
     @GetMapping(path = "/intake/projects", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    public List<ProjectSummary> listProjects(@RequestParam(value = "limit", required = false) Integer limit) {
+    public List<ProjectSummary> listProjects(@RequestParam(value = "limit", required = false) Integer limit,
+                                             @RequestParam(value = "q", required = false) String query,
+                                             @RequestParam(value = "sortBy", required = false) String sortBy,
+                                             @RequestParam(value = "sortDir", required = false) String sortDir) {
         int capped = (limit == null) ? 50 : Math.min(Math.max(limit, 1), 200);
-        return intakeService.listRecentProjects(capped);
+        return intakeService.listRecentProjects(capped, query, sortBy, sortDir);
     }
+
     @PostMapping(path = "/intake", consumes = "multipart/form-data")
     public String submit(@Valid @ModelAttribute("form") IntakeForm form,
                          BindingResult bindingResult,
@@ -115,7 +119,7 @@ public class IntakeController {
             redirectAttributes.addFlashAttribute("saved", true);
             return "redirect:/intake?projectId=" + projectId;
         } catch (org.springframework.dao.DuplicateKeyException ex) {
-            bindingResult.rejectValue("projectName", "projectName.duplicate", "Esiste già un progetto con questo nome.");
+            bindingResult.rejectValue("projectName", "projectName.duplicate", "Esiste gia un progetto con questo nome.");
             model.addAttribute("confirmedSections", intakeService.loadConfirmedSections(form.getDraftId()));
             model.addAttribute("enforceSectionLock", intakeService.isEnforceSectionOrder());
             return "intake";
@@ -193,14 +197,18 @@ public class IntakeController {
             if (name.isBlank()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Inserisci il nome progetto prima di confermare."));
             }
+            String kind = request.projectKind == null ? "" : request.projectKind.trim();
+            if (kind.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Seleziona il tipo di progetto prima di confermare."));
+            }
             UUID existing = intakeService.findProjectIdByName(name);
             if (existing != null && (request.projectId == null || !existing.equals(request.projectId))) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Esiste già un progetto con questo nome. Usa \"Modifica scheda esistente\" per aggiornarlo."));
+                return ResponseEntity.badRequest().body(Map.of("error", "Esiste gia un progetto con questo nome. Usa \"Modifica scheda esistente\" per aggiornarlo."));
             }
         }
         try {
             UUID draftId = intakeService.getOrCreateDraft(request.draftId, request.projectId);
-            intakeService.confirmSection(draftId, request.sectionKey, principal.getName());
+            intakeService.confirmSection(draftId, request.sectionKey, principal.getName(), request.projectKind);
             List<String> confirmed = intakeService.loadConfirmedSections(draftId);
             return ResponseEntity.ok(Map.of("confirmedSections", confirmed, "draftId", draftId));
         } catch (IllegalArgumentException ex) {
@@ -216,7 +224,7 @@ public class IntakeController {
             return ResponseEntity.badRequest().body(Map.of("error", "draftId and sectionKey required"));
         }
         try {
-            intakeService.unconfirmSection(request.draftId, request.sectionKey, principal.getName());
+            intakeService.unconfirmSection(request.draftId, request.sectionKey, principal.getName(), request.projectKind);
             List<String> confirmed = intakeService.loadConfirmedSections(request.draftId);
             return ResponseEntity.ok(Map.of("confirmedSections", confirmed));
         } catch (IllegalArgumentException ex) {
@@ -229,13 +237,7 @@ public class IntakeController {
         public UUID projectId;
         public String sectionKey;
         public String projectName;
+        public String projectKind;
     }
 }
-
-
-
-
-
-
-
 

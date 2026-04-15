@@ -101,14 +101,29 @@ public class IntakeForm {
     private List<String> adChannels;
     private List<String> marketplaceChannels;
 
+    @Pattern(regexp = "^(?:presentazione_azienda|raccolta_contatti|richiesta_preventivi|prenotazioni|download_brochure|supporto_commerciale)?$", message = "Seleziona un obiettivo vetrina valido.")
+    private String showcaseGoal;
+    private Integer showcasePageCount;
+    private String showcaseRequestedPages;
+    private String showcaseHomepageSections;
+    @Pattern(regexp = "^(?:contattaci|richiedi_preventivo|prenota_chiamata|vieni_in_sede|scarica_brochure)?$", message = "Seleziona una CTA principale valida.")
+    private String showcasePrimaryCta;
+    private Boolean showcaseHasPortfolio;
+    private Boolean showcaseHasTestimonials;
+    private Boolean showcaseHasFaq;
+    private Boolean showcaseHasBrochure;
+    private Boolean showcaseHasBlog;
+    private Boolean showcaseNeedsAboutPage;
+    private Boolean showcaseNeedsWherePage;
+    private Boolean showcaseNeedsServicesPage;
+    private Boolean showcaseNeedsContactForm;
+    private Boolean showcaseNeedsExternalLinks;
+    private String showcaseContactFormEmail;
+    private Boolean showcaseHasSeparateShop;
+    private String showcaseSeparateShopUrl;
+
     private String inspirationSites;
     private String requestedMenu;
-    private Boolean needsAboutPage;
-    private Boolean needsWherePage;
-    private Boolean needsServicesPage;
-    private Boolean needsContactForm;
-    private Boolean needsExternalLinks;
-    private String contactFormEmail;
     @Pattern(regexp = "^(?:scrivi_cliente|genera_ai|misto)?$", message = "Seleziona una modalita copy valida.")
     private String copyMode;
     @Pattern(regexp = "^(?:non_iniziato|in_test|completato)?$", message = "Seleziona uno stato test valido.")

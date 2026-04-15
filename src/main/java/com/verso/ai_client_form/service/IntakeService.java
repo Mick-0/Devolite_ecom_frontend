@@ -30,7 +30,7 @@ public class IntakeService {
 
     private final List<String> sectionOrder = List.of(
         "company", "contact", "project", "crm", "legal", "brand", "marketing",
-        "site", "domain", "local", "commercial", "ai", "ecommerce", "files"
+        "vetrina", "site", "domain", "local", "commercial", "ai", "ecommerce", "files"
     );
 
     public IntakeService(IntakeRepository repo, StaffUserRepository staffRepo, StorageService storageService) {
@@ -43,19 +43,29 @@ public class IntakeService {
         return enforceSectionOrder;
     }
 
+    public boolean isSectionApplicable(String sectionKey, String projectKind) {
+        String normalizedKind = normalizeProjectKind(projectKind);
+        return switch (sectionKey) {
+            case "vetrina" -> "vetrina".equalsIgnoreCase(normalizedKind);
+            case "site", "ecommerce" -> "ecommerce".equalsIgnoreCase(normalizedKind);
+            default -> true;
+        };
+    }
+
     @Transactional(readOnly = true)
     public UUID findProjectIdByName(String projectName) {
         return repo.findProjectIdByName(projectName).orElse(null);
     }
 
     @Transactional(readOnly = true)
-    public List<ProjectSummary> listRecentProjects(int limit) {
-        return repo.listRecentProjects(limit);
+    public List<ProjectSummary> listRecentProjects(int limit, String query, String sortBy, String sortDir) {
+        return repo.listRecentProjects(limit, query, sortBy, sortDir);
     }
 
     @Transactional
     public UUID save(IntakeForm form, String username) {
         UUID staffUserId = ensureStaffUser(username);
+        String projectKind = normalizeProjectKind(form.getProjectKind());
 
         String normalizedVat = emptyToNull(form.getVatNumber());
         form.setVatNumber(normalizedVat);
@@ -95,12 +105,12 @@ public class IntakeService {
         }
         projectId = repo.upsertProject(projectId, companyId, map(
             "project_name", form.getProjectName(),
-            "project_kind", defaultIfBlank(form.getProjectKind(), "vetrina"),
+            "project_kind", projectKind,
             "expected_outcome", form.getExpectedOutcome(),
             "status", defaultIfBlank(form.getStatus(), "onboarding")
         ));
 
-        repo.initProjectSteps(projectId, defaultIfBlank(form.getProjectKind(), "vetrina"));
+        repo.initProjectSteps(projectId, projectKind);
 
         repo.upsertCrmContact(companyId, map(
             "first_name", form.getCrmFirstName(),
@@ -155,20 +165,32 @@ public class IntakeService {
         repo.replaceAdChannels(projectId, nullToEmpty(form.getAdChannels()));
         repo.replaceMarketplaceChannels(projectId, nullToEmpty(form.getMarketplaceChannels()));
 
-        repo.upsertSiteBrief(projectId, map(
-            "inspiration_sites", form.getInspirationSites(),
-            "requested_menu", form.getRequestedMenu(),
-            "needs_about_page", bool(form.getNeedsAboutPage()),
-            "needs_where_page", bool(form.getNeedsWherePage()),
-            "needs_services_page", bool(form.getNeedsServicesPage()),
-            "needs_contact_form", bool(form.getNeedsContactForm()),
-            "needs_external_links", bool(form.getNeedsExternalLinks()),
-            "contact_form_email", form.getContactFormEmail(),
-            "copy_mode", emptyToNull(form.getCopyMode()),
-            "page_test_status", emptyToNull(form.getPageTestStatus()),
-            "has_existing_ecommerce", bool(form.getHasExistingEcommerce()),
-            "existing_ecommerce_url", emptyToNull(form.getExistingEcommerceUrl())
-        ));
+        if ("vetrina".equalsIgnoreCase(projectKind)) {
+            Integer showcasePageCount = form.getShowcasePageCount();
+            if (showcasePageCount != null && showcasePageCount < 0) {
+                showcasePageCount = 0;
+            }
+            repo.upsertShowcaseBrief(projectId, map(
+                "site_goal", emptyToNull(form.getShowcaseGoal()),
+                "page_count", showcasePageCount,
+                "requested_pages", form.getShowcaseRequestedPages(),
+                "homepage_sections", form.getShowcaseHomepageSections(),
+                "primary_cta", emptyToNull(form.getShowcasePrimaryCta()),
+                "has_portfolio", bool(form.getShowcaseHasPortfolio()),
+                "has_testimonials", bool(form.getShowcaseHasTestimonials()),
+                "has_faq", bool(form.getShowcaseHasFaq()),
+                "has_brochure", bool(form.getShowcaseHasBrochure()),
+                "has_blog", bool(form.getShowcaseHasBlog()),
+                "needs_about_page", bool(form.getShowcaseNeedsAboutPage()),
+                "needs_where_page", bool(form.getShowcaseNeedsWherePage()),
+                "needs_services_page", bool(form.getShowcaseNeedsServicesPage()),
+                "needs_contact_form", bool(form.getShowcaseNeedsContactForm()),
+                "needs_external_links", bool(form.getShowcaseNeedsExternalLinks()),
+                "contact_form_email", emptyToNull(form.getShowcaseContactFormEmail()),
+                "has_separate_shop", bool(form.getShowcaseHasSeparateShop()),
+                "separate_shop_url", emptyToNull(form.getShowcaseSeparateShopUrl())
+            ));
+        }
 
         repo.upsertDomainSetup(projectId, map(
             "has_existing_domain", bool(form.getHasExistingDomain()),
@@ -227,7 +249,15 @@ public class IntakeService {
             "seo_credits_used", seoUsed
         ));
 
-        if ("ecommerce".equalsIgnoreCase(form.getProjectKind())) {
+        if ("ecommerce".equalsIgnoreCase(projectKind)) {
+            repo.upsertSiteBrief(projectId, map(
+                "inspiration_sites", form.getInspirationSites(),
+                "requested_menu", form.getRequestedMenu(),
+                "copy_mode", emptyToNull(form.getCopyMode()),
+                "page_test_status", emptyToNull(form.getPageTestStatus()),
+                "has_existing_ecommerce", bool(form.getHasExistingEcommerce()),
+                "existing_ecommerce_url", emptyToNull(form.getExistingEcommerceUrl())
+            ));
             Integer productCount = form.getProductCount();
             if (productCount != null && productCount < 0) {
                 productCount = 0;
@@ -288,15 +318,19 @@ public class IntakeService {
     }
 
     @Transactional
-    public void confirmSection(UUID draftId, String sectionKey, String username) {
+    public void confirmSection(UUID draftId, String sectionKey, String username, String projectKind) {
         if (!sectionOrder.contains(sectionKey)) {
             throw new IllegalArgumentException("Unknown section");
+        }
+        String normalizedKind = normalizeProjectKind(projectKind);
+        if (!isSectionApplicable(sectionKey, normalizedKind)) {
+            throw new IllegalArgumentException("Sezione non applicabile al tipo di progetto selezionato.");
         }
         List<String> confirmed = repo.findConfirmedSections(draftId);
         int index = sectionOrder.indexOf(sectionKey);
         if (enforceSectionOrder && index > 0) {
-            String prev = sectionOrder.get(index - 1);
-            if (!confirmed.contains(prev)) {
+            String prev = previousApplicableSection(sectionKey, normalizedKind);
+            if (prev != null && !confirmed.contains(prev)) {
                 throw new IllegalArgumentException("Previous section not confirmed");
             }
         }
@@ -305,7 +339,7 @@ public class IntakeService {
     }
 
     @Transactional
-    public void unconfirmSection(UUID draftId, String sectionKey, String username) {
+    public void unconfirmSection(UUID draftId, String sectionKey, String username, String projectKind) {
         if (draftId == null) {
             throw new IllegalArgumentException("draftId required");
         }
@@ -415,19 +449,63 @@ public class IntakeService {
         form.setAdChannels(repo.findAdChannels(projectId));
         form.setMarketplaceChannels(repo.findMarketplaceChannels(projectId));
 
+        repo.findShowcaseBrief(projectId).ifPresent(row -> {
+            form.setShowcaseGoal((String) row.get("site_goal"));
+            form.setShowcasePageCount(toInteger(row.get("page_count")));
+            form.setShowcaseRequestedPages((String) row.get("requested_pages"));
+            form.setShowcaseHomepageSections((String) row.get("homepage_sections"));
+            form.setShowcasePrimaryCta((String) row.get("primary_cta"));
+            form.setShowcaseHasPortfolio(toBoolean(row.get("has_portfolio")));
+            form.setShowcaseHasTestimonials(toBoolean(row.get("has_testimonials")));
+            form.setShowcaseHasFaq(toBoolean(row.get("has_faq")));
+            form.setShowcaseHasBrochure(toBoolean(row.get("has_brochure")));
+            form.setShowcaseHasBlog(toBoolean(row.get("has_blog")));
+            form.setShowcaseNeedsAboutPage(toBoolean(row.get("needs_about_page")));
+            form.setShowcaseNeedsWherePage(toBoolean(row.get("needs_where_page")));
+            form.setShowcaseNeedsServicesPage(toBoolean(row.get("needs_services_page")));
+            form.setShowcaseNeedsContactForm(toBoolean(row.get("needs_contact_form")));
+            form.setShowcaseNeedsExternalLinks(toBoolean(row.get("needs_external_links")));
+            form.setShowcaseContactFormEmail((String) row.get("contact_form_email"));
+            form.setShowcaseHasSeparateShop(toBoolean(row.get("has_separate_shop")));
+            form.setShowcaseSeparateShopUrl((String) row.get("separate_shop_url"));
+        });
+
         repo.findSiteBrief(projectId).ifPresent(row -> {
             form.setInspirationSites((String) row.get("inspiration_sites"));
             form.setRequestedMenu((String) row.get("requested_menu"));
-            form.setNeedsAboutPage(toBoolean(row.get("needs_about_page")));
-            form.setNeedsWherePage(toBoolean(row.get("needs_where_page")));
-            form.setNeedsServicesPage(toBoolean(row.get("needs_services_page")));
-            form.setNeedsContactForm(toBoolean(row.get("needs_contact_form")));
-            form.setNeedsExternalLinks(toBoolean(row.get("needs_external_links")));
-            form.setContactFormEmail((String) row.get("contact_form_email"));
             form.setCopyMode((String) row.get("copy_mode"));
             form.setPageTestStatus((String) row.get("page_test_status"));
             form.setHasExistingEcommerce(toBoolean(row.get("has_existing_ecommerce")));
             form.setExistingEcommerceUrl((String) row.get("existing_ecommerce_url"));
+            if ("vetrina".equalsIgnoreCase(form.getProjectKind())) {
+                if (isBlank(form.getShowcaseRequestedPages())) {
+                    form.setShowcaseRequestedPages((String) row.get("requested_menu"));
+                }
+                if (form.getShowcaseNeedsAboutPage() == null) {
+                    form.setShowcaseNeedsAboutPage(toBoolean(row.get("needs_about_page")));
+                }
+                if (form.getShowcaseNeedsWherePage() == null) {
+                    form.setShowcaseNeedsWherePage(toBoolean(row.get("needs_where_page")));
+                }
+                if (form.getShowcaseNeedsServicesPage() == null) {
+                    form.setShowcaseNeedsServicesPage(toBoolean(row.get("needs_services_page")));
+                }
+                if (form.getShowcaseNeedsContactForm() == null) {
+                    form.setShowcaseNeedsContactForm(toBoolean(row.get("needs_contact_form")));
+                }
+                if (form.getShowcaseNeedsExternalLinks() == null) {
+                    form.setShowcaseNeedsExternalLinks(toBoolean(row.get("needs_external_links")));
+                }
+                if (isBlank(form.getShowcaseContactFormEmail())) {
+                    form.setShowcaseContactFormEmail((String) row.get("contact_form_email"));
+                }
+                if (form.getShowcaseHasSeparateShop() == null) {
+                    form.setShowcaseHasSeparateShop(toBoolean(row.get("has_existing_ecommerce")));
+                }
+                if (isBlank(form.getShowcaseSeparateShopUrl())) {
+                    form.setShowcaseSeparateShopUrl((String) row.get("existing_ecommerce_url"));
+                }
+            }
         });
 
         repo.findDomainSetup(projectId).ifPresent(row -> {
@@ -544,8 +622,27 @@ public class IntakeService {
         return s != null && !s.isBlank();
     }
 
+    private boolean isBlank(String s) {
+        return s == null || s.isBlank();
+    }
+
     private String defaultIfBlank(String s, String fallback) {
         return (s == null || s.isBlank()) ? fallback : s;
+    }
+
+    private String normalizeProjectKind(String projectKind) {
+        return defaultIfBlank(projectKind, "vetrina");
+    }
+
+    private String previousApplicableSection(String sectionKey, String projectKind) {
+        int index = sectionOrder.indexOf(sectionKey);
+        for (int i = index - 1; i >= 0; i--) {
+            String candidate = sectionOrder.get(i);
+            if (isSectionApplicable(candidate, projectKind)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private String emptyToNull(String s) {

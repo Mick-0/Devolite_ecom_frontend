@@ -323,27 +323,54 @@ public class IntakeRepository {
         }
     }
 
-    public void upsertSiteBrief(UUID projectId, Map<String, Object> data) {
+    public void upsertShowcaseBrief(UUID projectId, Map<String, Object> data) {
         String sql = """
-            insert into sito.site_brief
-                (project_id, inspiration_sites, requested_menu, needs_about_page,
-                 needs_where_page, needs_services_page, needs_contact_form,
-                 needs_external_links, contact_form_email, copy_mode, page_test_status,
-                 has_existing_ecommerce, existing_ecommerce_url)
+            insert into sito.vetrina_brief
+                (project_id, site_goal, page_count, requested_pages, homepage_sections,
+                 primary_cta, has_portfolio, has_testimonials, has_faq, has_brochure,
+                 has_blog, needs_about_page, needs_where_page, needs_services_page,
+                 needs_contact_form, needs_external_links, contact_form_email,
+                 has_separate_shop, separate_shop_url)
             values
-                (:project_id, :inspiration_sites, :requested_menu, :needs_about_page,
-                 :needs_where_page, :needs_services_page, :needs_contact_form,
-                 :needs_external_links, :contact_form_email, :copy_mode, :page_test_status,
-                 :has_existing_ecommerce, :existing_ecommerce_url)
+                (:project_id, :site_goal, :page_count, :requested_pages, :homepage_sections,
+                 :primary_cta, :has_portfolio, :has_testimonials, :has_faq, :has_brochure,
+                 :has_blog, :needs_about_page, :needs_where_page, :needs_services_page,
+                 :needs_contact_form, :needs_external_links, :contact_form_email,
+                 :has_separate_shop, :separate_shop_url)
             on conflict (project_id) do update set
-                inspiration_sites = excluded.inspiration_sites,
-                requested_menu = excluded.requested_menu,
+                site_goal = excluded.site_goal,
+                page_count = excluded.page_count,
+                requested_pages = excluded.requested_pages,
+                homepage_sections = excluded.homepage_sections,
+                primary_cta = excluded.primary_cta,
+                has_portfolio = excluded.has_portfolio,
+                has_testimonials = excluded.has_testimonials,
+                has_faq = excluded.has_faq,
+                has_brochure = excluded.has_brochure,
+                has_blog = excluded.has_blog,
                 needs_about_page = excluded.needs_about_page,
                 needs_where_page = excluded.needs_where_page,
                 needs_services_page = excluded.needs_services_page,
                 needs_contact_form = excluded.needs_contact_form,
                 needs_external_links = excluded.needs_external_links,
                 contact_form_email = excluded.contact_form_email,
+                has_separate_shop = excluded.has_separate_shop,
+                separate_shop_url = excluded.separate_shop_url
+            """;
+        jdbc.update(sql, new MapSqlParameterSource(data).addValue("project_id", projectId));
+    }
+
+    public void upsertSiteBrief(UUID projectId, Map<String, Object> data) {
+        String sql = """
+            insert into sito.site_brief
+                (project_id, inspiration_sites, requested_menu, copy_mode, page_test_status,
+                 has_existing_ecommerce, existing_ecommerce_url)
+            values
+                (:project_id, :inspiration_sites, :requested_menu, :copy_mode, :page_test_status,
+                 :has_existing_ecommerce, :existing_ecommerce_url)
+            on conflict (project_id) do update set
+                inspiration_sites = excluded.inspiration_sites,
+                requested_menu = excluded.requested_menu,
                 copy_mode = excluded.copy_mode,
                 page_test_status = excluded.page_test_status,
                 has_existing_ecommerce = excluded.has_existing_ecommerce,
@@ -592,25 +619,54 @@ public class IntakeRepository {
         return id;
     }
 
-    public List<ProjectSummary> listRecentProjects(int limit) {
+    public List<ProjectSummary> listRecentProjects(int limit, String query, String sortBy, String sortDir) {
         int capped = Math.max(1, Math.min(limit, 200));
+        String orderExpression = projectSortExpression(sortBy);
+        String direction = "asc".equalsIgnoreCase(sortDir) ? "asc" : "desc";
         String sql = """
             select p.id as project_id,
                    p.project_name,
                    p.project_kind,
+                   p.status as project_status,
                    p.updated_at,
-                   c.legal_name as company_name
+                   c.legal_name as company_name,
+                   c.vat_number,
+                   cp.city,
+                   cc.full_name as contact_name,
+                   cc.email as contact_email
             from core.web_project p
             join core.client_company c on c.id = p.company_id
-            order by p.updated_at desc, p.created_at desc
+            left join anagrafica.company_profile cp on cp.company_id = c.id
+            left join anagrafica.company_contact cc on cc.company_id = c.id and cc.is_primary = true
+            where (
+                :query is null
+                or p.project_name ilike :query_like
+                or c.legal_name ilike :query_like
+                or coalesce(c.vat_number, '') ilike :query_like
+                or coalesce(cp.city, '') ilike :query_like
+                or coalesce(cc.full_name, '') ilike :query_like
+                or coalesce(cc.email, '') ilike :query_like
+                or p.project_kind ilike :query_like
+                or p.status ilike :query_like
+            )
+            order by %s %s nulls last, p.updated_at desc, p.created_at desc
             limit :limit
-            """;
-        return jdbc.query(sql, new MapSqlParameterSource("limit", capped), (rs, i) ->
+            """.formatted(orderExpression, direction);
+        MapSqlParameterSource params = new MapSqlParameterSource()
+            .addValue("limit", capped)
+            .addValue("query", hasText(query) ? query.trim() : null)
+            .addValue("query_like", hasText(query) ? "%" + query.trim() + "%" : null);
+        return jdbc.query(sql, params, (rs, i) ->
             new ProjectSummary(
                 rs.getObject("project_id", UUID.class),
                 rs.getString("project_name"),
                 rs.getString("company_name"),
                 rs.getString("project_kind"),
+                rs.getString("project_status"),
+                rs.getString("vat_number"),
+                rs.getString("city"),
+                rs.getString("contact_name"),
+                rs.getString("contact_email"),
                 rs.getObject("updated_at", OffsetDateTime.class)
             )
         );
@@ -655,6 +711,10 @@ public class IntakeRepository {
     public List<String> findMarketplaceChannels(UUID projectId) {
         return jdbc.query("select marketplace_name from marketing.marketplace_channel where project_id = :id",
             new MapSqlParameterSource("id", projectId), (rs, i) -> rs.getString(1));
+    }
+
+    public Optional<Map<String, Object>> findShowcaseBrief(UUID projectId) {
+        return queryForMapOptional("select * from sito.vetrina_brief where project_id = :id", Map.of("id", projectId));
     }
 
     public Optional<Map<String, Object>> findSiteBrief(UUID projectId) {
@@ -721,6 +781,21 @@ public class IntakeRepository {
         String slug = input.toLowerCase().replaceAll("[^a-z0-9]+", "-");
         slug = slug.replaceAll("(^-+|-+$)", "");
         return slug.isBlank() ? "category" : slug;
+    }
+
+    private String projectSortExpression(String sortBy) {
+        return switch (sortBy == null ? "" : sortBy) {
+            case "projectName" -> "lower(p.project_name)";
+            case "companyName" -> "lower(c.legal_name)";
+            case "projectKind" -> "lower(p.project_kind)";
+            case "projectStatus" -> "lower(p.status)";
+            case "city" -> "lower(cp.city)";
+            default -> "p.updated_at";
+        };
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     public UUID createDraft(UUID projectId) {

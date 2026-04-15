@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
   const sections = Array.from(document.querySelectorAll('main section.card[id]'));
   const links = Array.from(document.querySelectorAll('.side nav a[data-section]'));
 
@@ -11,6 +11,7 @@
     bodyLockAttr !== undefined ? bodyLockAttr : window.__enforceSectionLock
   ).toLowerCase() !== 'false';
   const form = document.querySelector('#intakeForm');
+  const projectKindField = form?.querySelector('[name="projectKind"]');
   let progressEls = Array.from(document.querySelectorAll('.form-progress'));
   const side = document.querySelector('.side');
   const sideNav = side?.querySelector('nav');
@@ -40,10 +41,13 @@
   const openExistingBtn = document.querySelector('[data-open-existing]');
   const projectList = existingModal?.querySelector('[data-project-list]');
   const projectSearch = existingModal?.querySelector('[data-project-search]');
+  const projectSortBy = existingModal?.querySelector('[data-project-sort-by]');
+  const projectSortDir = existingModal?.querySelector('[data-project-sort-dir]');
   const projectOpen = existingModal?.querySelector('[data-project-open]');
   const projectStatus = existingModal?.querySelector('[data-project-status]');
   const modalCloseButtons = existingModal ? Array.from(existingModal.querySelectorAll('[data-modal-close]')) : [];
   let cachedProjects = [];
+  let projectFetchTimer = null;
 
   const formatProjectDate = (value) => {
     if (!value) return '';
@@ -53,7 +57,41 @@
   };
 
   const projectKindLabels = { vetrina: 'Vetrina', ecommerce: 'E-commerce' };
+  const projectStatusLabels = {
+    in_discovery: 'In analisi',
+    onboarding: 'Avvio',
+    in_production: 'In produzione',
+    delivered: 'Consegnato',
+    archived: 'Archiviato'
+  };
   const formatProjectKind = (value) => projectKindLabels[value] || value || '-';
+  const formatProjectStatus = (value) => projectStatusLabels[value] || value || '-';
+  const getCurrentProjectKind = () => (projectKindField?.value || '').trim();
+  const getApplicability = (element) => element?.dataset?.applicable || 'both';
+  const isApplicableElement = (element) => {
+    const applicability = getApplicability(element);
+    if (applicability === 'both') return true;
+    const currentKind = getCurrentProjectKind();
+    if (!currentKind) return false;
+    return applicability === currentKind;
+  };
+  const getApplicableSections = () => sections.filter(section => isApplicableElement(section));
+  const getKindBadge = (applicability) => {
+    const currentKind = getCurrentProjectKind();
+    if (!currentKind) {
+      return 'Seleziona tipo';
+    }
+    return applicability === 'vetrina' ? 'Solo vetrina' : 'Solo e-commerce';
+  };
+  const getKindMessage = (applicability) => {
+    const currentKind = getCurrentProjectKind();
+    if (!currentKind) {
+      return 'Seleziona prima il tipo di progetto';
+    }
+    return applicability === 'vetrina'
+      ? 'Disponibile solo per siti vetrina'
+      : 'Disponibile solo per progetti e-commerce';
+  };
 
   const renderProjectList = (items) => {
     if (!projectList) return;
@@ -79,10 +117,24 @@
       const kind = document.createElement('span');
       kind.className = 'modal-tag';
       kind.textContent = formatProjectKind(item.projectKind);
+      const status = document.createElement('span');
+      status.className = 'modal-tag';
+      status.textContent = formatProjectStatus(item.projectStatus);
       const time = document.createElement('span');
       time.textContent = formatProjectDate(item.updatedAt);
-      meta.append(company, kind, time);
-      button.append(title, meta);
+      meta.append(company, kind, status, time);
+      const detail = document.createElement('div');
+      detail.className = 'modal-item__detail';
+      const contact = document.createElement('span');
+      contact.textContent = item.contactName ? `Referente: ${item.contactName}` : 'Referente: -';
+      const email = document.createElement('span');
+      email.textContent = item.contactEmail ? `Email: ${item.contactEmail}` : 'Email: -';
+      const vat = document.createElement('span');
+      vat.textContent = item.vatNumber ? `P.IVA: ${item.vatNumber}` : 'P.IVA: -';
+      const city = document.createElement('span');
+      city.textContent = item.city ? `Citta: ${item.city}` : 'Citta: -';
+      detail.append(contact, email, vat, city);
+      button.append(title, meta, detail);
       button.addEventListener('click', () => {
         if (item.projectId) {
           window.location.href = `/intake?projectId=${encodeURIComponent(item.projectId)}`;
@@ -94,19 +146,27 @@
     });
   };
 
-  const applyProjectFilter = () => {
-    const query = (projectSearch?.value || '').trim().toLowerCase();
-    if (!query) {
-      renderProjectList(cachedProjects);
-      return;
+  const buildProjectQueryString = () => {
+    const params = new URLSearchParams();
+    params.set('limit', '100');
+    const query = (projectSearch?.value || '').trim();
+    const sortBy = projectSortBy?.value || 'updatedAt';
+    const sortDir = projectSortDir?.value || 'desc';
+    if (query) {
+      params.set('q', query);
     }
-    const filtered = cachedProjects.filter(item => {
-      const name = (item.projectName || '').toLowerCase();
-      const company = (item.companyName || '').toLowerCase();
-      const kind = (item.projectKind || '').toLowerCase();
-      return name.includes(query) || company.includes(query) || kind.includes(query);
-    });
-    renderProjectList(filtered);
+    params.set('sortBy', sortBy);
+    params.set('sortDir', sortDir);
+    return params.toString();
+  };
+
+  const scheduleProjectFetch = () => {
+    if (projectFetchTimer) {
+      window.clearTimeout(projectFetchTimer);
+    }
+    projectFetchTimer = window.setTimeout(() => {
+      fetchProjects();
+    }, 220);
   };
 
   const fetchProjects = async () => {
@@ -114,7 +174,7 @@
     projectList.innerHTML = '<div class="modal-empty">Caricamento...</div>';
     if (projectStatus) projectStatus.textContent = '';
     try {
-      const response = await fetch('/intake/projects?limit=100', {
+      const response = await fetch(`/intake/projects?${buildProjectQueryString()}`, {
         headers: { 'Accept': 'application/json' }
       });
       if (!response.ok) {
@@ -137,6 +197,12 @@
       projectSearch.value = '';
       setTimeout(() => projectSearch.focus(), 0);
     }
+    if (projectSortBy) {
+      projectSortBy.value = 'updatedAt';
+    }
+    if (projectSortDir) {
+      projectSortDir.value = 'desc';
+    }
     fetchProjects();
   };
 
@@ -150,31 +216,49 @@
 
   const openProjectByName = () => {
     const value = (projectSearch?.value || '').trim();
-    if (!value) {
-      if (projectStatus) projectStatus.textContent = 'Inserisci un nome progetto.';
+    if (!value && !cachedProjects.length) {
+      if (projectStatus) projectStatus.textContent = 'Inserisci un criterio di ricerca oppure seleziona un progetto dalla lista.';
       return;
     }
+    const lowered = value.toLowerCase();
     const match = cachedProjects.find(item =>
-      (item.projectName || '').toLowerCase() === value.toLowerCase()
+      (item.projectName || '').toLowerCase() === lowered
+      || (item.companyName || '').toLowerCase() === lowered
+      || (item.vatNumber || '').toLowerCase() === lowered
+      || (item.contactEmail || '').toLowerCase() === lowered
     );
     if (match && match.projectId) {
       window.location.href = `/intake?projectId=${encodeURIComponent(match.projectId)}`;
       return;
     }
-    window.location.href = `/intake?projectName=${encodeURIComponent(value)}`;
+    if (cachedProjects.length === 1 && cachedProjects[0].projectId) {
+      window.location.href = `/intake?projectId=${encodeURIComponent(cachedProjects[0].projectId)}`;
+      return;
+    }
+    if (projectStatus) {
+      projectStatus.textContent = cachedProjects.length > 1
+        ? 'Sono presenti piu risultati. Selezionane uno dalla lista.'
+        : 'Nessun progetto corrisponde ai criteri di ricerca.';
+    }
   };
 
   if (openExistingBtn && existingModal) {
     openExistingBtn.addEventListener('click', openProjectModal);
     modalCloseButtons.forEach(btn => btn.addEventListener('click', closeProjectModal));
     if (projectSearch) {
-      projectSearch.addEventListener('input', applyProjectFilter);
+      projectSearch.addEventListener('input', scheduleProjectFetch);
       projectSearch.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
           event.preventDefault();
           openProjectByName();
         }
       });
+    }
+    if (projectSortBy) {
+      projectSortBy.addEventListener('change', fetchProjects);
+    }
+    if (projectSortDir) {
+      projectSortDir.addEventListener('change', fetchProjects);
     }
     if (projectOpen) {
       projectOpen.addEventListener('click', openProjectByName);
@@ -186,15 +270,26 @@
     });
   }
 
-
   const isFilled = (el) => {
-    if (el.type === 'hidden') return false;
+    if (el.disabled || el.type === 'hidden') return false;
     if (el.type === 'checkbox' || el.type === 'radio') return el.checked;
     if (el.type === 'file') return el.files && el.files.length > 0;
     return el.value && el.value.trim().length > 0;
   };
 
   const getTrackedFields = () => {
+    if (!form) return [];
+    return Array.from(form.querySelectorAll('input, textarea, select'))
+      .filter(field => {
+        if (field.disabled) return false;
+        if (field.type === 'hidden') return false;
+        if (field.hasAttribute('data-skip-progress')) return false;
+        if (['submit', 'reset', 'button', 'image'].includes(field.type)) return false;
+        return true;
+      });
+  };
+
+  const getProgressEligibleFields = () => {
     if (!form) return [];
     return Array.from(form.querySelectorAll('input, textarea, select'))
       .filter(field => {
@@ -206,6 +301,7 @@
   };
 
   const isCompleted = (field) => {
+    if (field.disabled) return false;
     if (field.type === 'checkbox' || field.type === 'radio') return field.checked;
     if (field.type === 'file') return field.files && field.files.length > 0;
     if (field.tagName === 'SELECT') return field.value !== '';
@@ -232,13 +328,22 @@
     });
   };
 
+  const updateFieldCompletion = () => {
+    const fields = getProgressEligibleFields();
+    fields.forEach(field => {
+      const wrapper = field.closest('.field') || field.closest('.check-row') || field.closest('.pill');
+      if (!wrapper) return;
+      wrapper.classList.toggle('field-complete', isCompleted(field));
+    });
+  };
+
   const updateProgress = () => {
     if (!progressTargets.length) return;
     const fields = getTrackedFields();
     const total = fields.length;
     const completed = fields.reduce((acc, field) => acc + (isCompleted(field) ? 1 : 0), 0);
     const percent = total ? Math.round((completed / total) * 100) : 0;
-    updateFieldCompletion(fields);
+    updateFieldCompletion();
     progressTargets.forEach(({ el, valueEl, fillEl }) => {
       if (valueEl) {
         valueEl.textContent = `${percent}% (${completed}/${total})`;
@@ -247,16 +352,6 @@
         fillEl.style.width = `${percent}%`;
       }
       el.setAttribute('aria-valuenow', String(percent));
-    });
-  };
-
-  const updateFieldCompletion = (fields) => {
-    if (!fields) return;
-    fields.forEach(field => {
-      if (field.hasAttribute('data-skip-progress')) return;
-      const wrapper = field.closest('.field') || field.closest('.check-row') || field.closest('.pill');
-      if (!wrapper) return;
-      wrapper.classList.toggle('field-complete', isCompleted(field));
     });
   };
 
@@ -271,27 +366,38 @@
   };
 
   const computeMaxUnlocked = () => {
+    const applicableSections = getApplicableSections();
+    if (!applicableSections.length) {
+      return -1;
+    }
     let idx = 0;
-    while (idx < sections.length && confirmed.has(sections[idx].id)) {
+    while (idx < applicableSections.length && confirmed.has(applicableSections[idx].id)) {
       idx += 1;
     }
-    return Math.min(idx, sections.length - 1);
+    return Math.min(idx, applicableSections.length - 1);
   };
 
   const updateNavState = () => {
+    const applicableSections = getApplicableSections();
     maxUnlockedIndex = computeMaxUnlocked();
-    sections.forEach((section, index) => {
+    sections.forEach((section) => {
       const link = byId.get(section.id);
       if (!link) return;
-      const locked = enforceSectionLock && index > maxUnlockedIndex;
-      link.classList.toggle('locked', locked);
-      link.classList.toggle('done', confirmed.has(section.id));
-      link.setAttribute('aria-disabled', locked ? 'true' : 'false');
-      link.tabIndex = locked ? -1 : 0;
+      const applicability = getApplicability(section);
+      const typeLocked = !isApplicableElement(section);
+      const applicableIndex = applicableSections.indexOf(section);
+      const orderLocked = !typeLocked && enforceSectionLock && applicableIndex > maxUnlockedIndex;
+      link.classList.toggle('locked', orderLocked);
+      link.classList.toggle('kind-locked', typeLocked);
+      link.classList.toggle('done', !typeLocked && confirmed.has(section.id));
+      link.setAttribute('aria-disabled', (orderLocked || typeLocked) ? 'true' : 'false');
+      link.tabIndex = (orderLocked || typeLocked) ? -1 : 0;
       const badge = ensureBadge(link);
-      if (confirmed.has(section.id)) {
+      if (typeLocked) {
+        badge.textContent = getKindBadge(applicability);
+      } else if (confirmed.has(section.id)) {
         badge.textContent = 'Completato';
-      } else if (locked) {
+      } else if (orderLocked) {
         badge.textContent = 'Bloccato';
       } else {
         badge.textContent = 'In attesa';
@@ -323,35 +429,46 @@
     return actions;
   };
 
-  const setFieldLock = (section, locked) => {
+  const setFieldLock = (section, options) => {
+    const { readOnlyLocked, typeLocked } = options;
     const fields = Array.from(section.querySelectorAll('input, textarea, select'));
     fields.forEach(field => {
       if (field.type === 'hidden') return;
-      if (locked) {
-        field.setAttribute('data-locked', 'true');
-        field.setAttribute('aria-disabled', 'true');
-        field.setAttribute('tabindex', '-1');
-        if (typeof field.readOnly !== 'undefined' && field.tagName !== 'SELECT') {
-          field.readOnly = true;
-        }
-      } else {
-        field.removeAttribute('data-locked');
+      const supportsReadOnly = field.tagName !== 'SELECT' && !['checkbox', 'radio', 'file', 'color'].includes(field.type);
+      if (typeLocked) {
+        field.disabled = true;
         field.removeAttribute('aria-disabled');
         field.removeAttribute('tabindex');
-        if (typeof field.readOnly !== 'undefined' && field.tagName !== 'SELECT') {
+        if (supportsReadOnly) {
           field.readOnly = false;
+        }
+      } else {
+        field.disabled = false;
+        if (supportsReadOnly) {
+          field.readOnly = readOnlyLocked;
+        }
+        if (readOnlyLocked) {
+          field.setAttribute('aria-disabled', 'true');
+          field.setAttribute('tabindex', '-1');
+        } else {
+          field.removeAttribute('aria-disabled');
+          field.removeAttribute('tabindex');
         }
       }
       const wrapper = field.closest('.field') || field.closest('.check-row') || field.closest('.pill');
       if (wrapper) {
-        wrapper.classList.toggle('field-locked', locked);
+        wrapper.classList.toggle('field-locked', !typeLocked && readOnlyLocked);
+        wrapper.classList.toggle('field-kind-locked', typeLocked);
+        if (typeLocked) {
+          wrapper.classList.remove('field-complete');
+        }
       }
     });
   };
 
   const validateSection = (section) => {
     let valid = true;
-    const required = Array.from(section.querySelectorAll('[required]'));
+    const required = Array.from(section.querySelectorAll('[required]:not([disabled])'));
     required.forEach(field => {
       const filled = isFilled(field);
       const wrapper = field.closest('.field');
@@ -384,41 +501,68 @@
   };
 
   const lockSections = () => {
+    const applicableSections = getApplicableSections();
     maxUnlockedIndex = computeMaxUnlocked();
-    sections.forEach((section, index) => {
-      const locked = enforceSectionLock && index > maxUnlockedIndex;
-      section.classList.toggle('section-locked', locked);
+    sections.forEach(section => {
+      const applicability = getApplicability(section);
+      const typeLocked = !isApplicableElement(section);
+      const applicableIndex = applicableSections.indexOf(section);
+      const orderLocked = !typeLocked && enforceSectionLock && applicableIndex > maxUnlockedIndex;
+      const isConfirmed = !typeLocked && confirmed.has(section.id);
+      section.classList.toggle('section-locked', orderLocked);
+      section.classList.toggle('section-kind-locked', typeLocked);
+      if (typeLocked) {
+        section.setAttribute('data-lock-message', getKindMessage(applicability));
+      } else if (orderLocked) {
+        section.setAttribute('data-lock-message', 'Conferma la sezione precedente per continuare');
+      } else {
+        section.removeAttribute('data-lock-message');
+      }
       const button = section.querySelector('.section-confirm');
       const edit = section.querySelector('.section-edit');
       if (button) {
-        const isConfirmed = confirmed.has(section.id);
-        button.disabled = locked || isConfirmed;
-        button.textContent = isConfirmed ? 'Sezione confermata' : 'Conferma sezione';
+        button.disabled = typeLocked || orderLocked || isConfirmed;
+        button.textContent = typeLocked ? 'Sezione non applicabile' : (isConfirmed ? 'Sezione confermata' : 'Conferma sezione');
       }
       if (edit) {
-        edit.hidden = !confirmed.has(section.id);
-        edit.disabled = locked;
+        edit.hidden = !isConfirmed || typeLocked;
+        edit.disabled = orderLocked || typeLocked;
       }
-      setFieldLock(section, locked || confirmed.has(section.id));
+      setFieldLock(section, { readOnlyLocked: orderLocked || isConfirmed, typeLocked });
     });
     updateNavState();
+    updateProgress();
+  };
+
+  const getRequestPayload = (sectionId) => {
+    const draftIdInput = document.getElementById('draftId');
+    const rawDraftId = draftIdInput?.value;
+    const rawProjectId = document.getElementById('projectId')?.value;
+    return {
+      draftId: rawDraftId && rawDraftId.trim().length ? rawDraftId : null,
+      projectId: rawProjectId && rawProjectId.trim().length ? rawProjectId : null,
+      sectionKey: sectionId,
+      projectName: form?.querySelector('input[name="projectName"]')?.value?.trim() || null,
+      projectKind: getCurrentProjectKind() || null,
+      draftIdInput
+    };
   };
 
   const confirmSection = async (section) => {
-    const index = sections.indexOf(section);
-    if (enforceSectionLock && index > maxUnlockedIndex) {
+    const applicableSections = getApplicableSections();
+    const applicableIndex = applicableSections.indexOf(section);
+    if (applicableIndex < 0) {
+      return;
+    }
+    if (enforceSectionLock && applicableIndex > maxUnlockedIndex) {
       return;
     }
     if (!validateSection(section)) {
       return;
     }
-    const draftIdInput = document.getElementById('draftId');
-    const rawDraftId = draftIdInput?.value;
-    const rawProjectId = document.getElementById('projectId')?.value;
-    const draftId = rawDraftId && rawDraftId.trim().length ? rawDraftId : null;
-    const projectId = rawProjectId && rawProjectId.trim().length ? rawProjectId : null;
     const csrfToken = document.querySelector('input[name="_csrf"]')?.value;
     const csrfHeader = document.getElementById('csrfHeader')?.value || 'X-CSRF-TOKEN';
+    const payload = getRequestPayload(section.id);
 
     try {
       const previousMax = maxUnlockedIndex;
@@ -429,18 +573,19 @@
           [csrfHeader]: csrfToken
         },
         body: JSON.stringify({
-          draftId,
-          projectId,
-          sectionKey: section.id,
-          projectName: form?.querySelector('input[name="projectName"]')?.value?.trim() || null
+          draftId: payload.draftId,
+          projectId: payload.projectId,
+          sectionKey: payload.sectionKey,
+          projectName: payload.projectName,
+          projectKind: payload.projectKind
         })
       });
       if (!response.ok) {
         let message = 'Errore nel salvataggio della conferma. Riprova.';
         try {
-          const payload = await response.json();
-          if (payload && payload.error) {
-            message = payload.error;
+          const payloadResponse = await response.json();
+          if (payloadResponse && payloadResponse.error) {
+            message = payloadResponse.error;
           }
         } catch (err) {
           // ignore parsing errors
@@ -448,14 +593,15 @@
         throw new Error(message);
       }
       const data = await response.json();
-      if (data.draftId && draftIdInput) {
-        draftIdInput.value = data.draftId;
+      if (data.draftId && payload.draftIdInput) {
+        payload.draftIdInput.value = data.draftId;
       }
       confirmed.clear();
       (data.confirmedSections || []).forEach(s => confirmed.add(s));
       lockSections();
-      if (maxUnlockedIndex > previousMax && maxUnlockedIndex < sections.length) {
-        sections[maxUnlockedIndex].scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const nextApplicableSections = getApplicableSections();
+      if (maxUnlockedIndex > previousMax && nextApplicableSections[maxUnlockedIndex]) {
+        nextApplicableSections[maxUnlockedIndex].scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     } catch (err) {
       const alert = section.querySelector('.section-alert');
@@ -467,13 +613,9 @@
   };
 
   const editSection = async (section) => {
-    const draftIdInput = document.getElementById('draftId');
-    const rawDraftId = draftIdInput?.value;
-    const rawProjectId = document.getElementById('projectId')?.value;
-    const draftId = rawDraftId && rawDraftId.trim().length ? rawDraftId : null;
-    const projectId = rawProjectId && rawProjectId.trim().length ? rawProjectId : null;
     const csrfToken = document.querySelector('input[name="_csrf"]')?.value;
     const csrfHeader = document.getElementById('csrfHeader')?.value || 'X-CSRF-TOKEN';
+    const payload = getRequestPayload(section.id);
     try {
       const response = await fetch('/intake/section/edit', {
         method: 'POST',
@@ -481,14 +623,19 @@
           'Content-Type': 'application/json',
           [csrfHeader]: csrfToken
         },
-        body: JSON.stringify({ draftId, projectId, sectionKey: section.id })
+        body: JSON.stringify({
+          draftId: payload.draftId,
+          projectId: payload.projectId,
+          sectionKey: payload.sectionKey,
+          projectKind: payload.projectKind
+        })
       });
       if (!response.ok) {
         throw new Error('edit failed');
       }
       const data = await response.json();
-      if (data.draftId && draftIdInput) {
-        draftIdInput.value = data.draftId;
+      if (data.draftId && payload.draftIdInput) {
+        payload.draftIdInput.value = data.draftId;
       }
       confirmed.clear();
       (data.confirmedSections || []).forEach(s => confirmed.add(s));
@@ -512,7 +659,6 @@
     const height = Math.max(12, linkRect.height - 12);
     indicator.style.top = `${top}px`;
     indicator.style.height = `${height}px`;
-    // left summary scrolls with the page; no internal centering
   };
 
   const setActive = (id) => {
@@ -542,7 +688,7 @@
 
   links.forEach(link => {
     link.addEventListener('click', (event) => {
-      if (enforceSectionLock && link.classList.contains('locked')) {
+      if (enforceSectionLock && (link.classList.contains('locked') || link.classList.contains('kind-locked'))) {
         event.preventDefault();
       }
     });
@@ -562,8 +708,10 @@
     if (scrollLock) return;
     const locked = sections.find(section => section.classList.contains('section-locked') && section.getBoundingClientRect().top < 120);
     if (!locked) return;
+    const applicableSections = getApplicableSections();
+    if (!applicableSections[maxUnlockedIndex]) return;
     scrollLock = true;
-    sections[maxUnlockedIndex].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    applicableSections[maxUnlockedIndex].scrollIntoView({ behavior: 'smooth', block: 'start' });
     setTimeout(() => {
       scrollLock = false;
     }, 250);
@@ -581,6 +729,11 @@
     const active = links.find(l => l.classList.contains('active'));
     if (active) updateActiveIndicator(active);
   });
+  if (projectKindField) {
+    projectKindField.addEventListener('change', () => {
+      lockSections();
+    });
+  }
   if (form) {
     applyTodayDates();
     form.addEventListener('submit', () => {
@@ -600,12 +753,6 @@
     setInterval(updateProgress, 1000);
   }
 })();
-
-
-
-
-
-
 
 (function () {
   const form = document.querySelector('#intakeForm');
@@ -694,10 +841,3 @@
     syncContract();
   }
 })();
-
-
-
-
-
-
-

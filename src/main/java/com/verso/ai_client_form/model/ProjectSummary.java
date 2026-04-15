@@ -8,5 +8,10 @@ public record ProjectSummary(
     String projectName,
     String companyName,
     String projectKind,
+    String projectStatus,
+    String vatNumber,
+    String city,
+    String contactName,
+    String contactEmail,
     OffsetDateTime updatedAt
 ) {}
