@@ -17,6 +17,8 @@ public class IntakeForm {
     private UUID companyId;
     private UUID projectId;
     private UUID draftId;
+    // Used when opening the form from a pipeline row so we can mark it as done after save.
+    private UUID pipelineRowId;
 
     @NotBlank(message = "Inserisci la ragione sociale.")
     private String legalName;

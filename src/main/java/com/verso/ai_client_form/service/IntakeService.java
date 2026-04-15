@@ -24,6 +24,7 @@ public class IntakeService {
     private final IntakeRepository repo;
     private final StaffUserRepository staffRepo;
     private final StorageService storageService;
+    private final PipelineService pipelineService;
 
     @Value("${app.intake.enforce-section-order:true}")
     private boolean enforceSectionOrder;
@@ -33,10 +34,11 @@ public class IntakeService {
         "vetrina", "site", "domain", "local", "commercial", "ai", "ecommerce", "files"
     );
 
-    public IntakeService(IntakeRepository repo, StaffUserRepository staffRepo, StorageService storageService) {
+    public IntakeService(IntakeRepository repo, StaffUserRepository staffRepo, StorageService storageService, PipelineService pipelineService) {
         this.repo = repo;
         this.staffRepo = staffRepo;
         this.storageService = storageService;
+        this.pipelineService = pipelineService;
     }
 
     public boolean isEnforceSectionOrder() {
@@ -283,6 +285,13 @@ public class IntakeService {
         if (form.getDraftId() != null) {
             repo.linkDraftToProject(form.getDraftId(), projectId);
         }
+
+        // Mark pipeline row as completed (if the form was opened from a pipeline).
+        if (form.getPipelineRowId() != null) {
+            pipelineService.markRowDone(form.getPipelineRowId(), projectId);
+        }
+        // Fallback: if the user created the project starting from a pipeline row name.
+        pipelineService.markDoneByProjectName(form.getProjectName(), projectId);
 
         return projectId;
     }

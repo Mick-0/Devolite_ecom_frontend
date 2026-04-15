@@ -639,7 +639,7 @@ public class IntakeRepository {
             left join anagrafica.company_profile cp on cp.company_id = c.id
             left join anagrafica.company_contact cc on cc.company_id = c.id and cc.is_primary = true
             where (
-                :query is null
+                coalesce(:query_like, '') = ''
                 or p.project_name ilike :query_like
                 or c.legal_name ilike :query_like
                 or coalesce(c.vat_number, '') ilike :query_like
@@ -654,7 +654,6 @@ public class IntakeRepository {
             """.formatted(orderExpression, direction);
         MapSqlParameterSource params = new MapSqlParameterSource()
             .addValue("limit", capped)
-            .addValue("query", hasText(query) ? query.trim() : null)
             .addValue("query_like", hasText(query) ? "%" + query.trim() + "%" : null);
         return jdbc.query(sql, params, (rs, i) ->
             new ProjectSummary(

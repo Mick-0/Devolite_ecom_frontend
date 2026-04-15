@@ -1,0 +1,12 @@
+project_name;company_legal_name;vat_number;contact_full_name;contact_email;contact_phone;crm_temperature;crm_notes;crm_sector;crm_current_stage;crm_cta
+ZDevolite Demo 01;ZAcme Srl;IT12345678901;Mario Rossi;mario.rossi@acme.it;+39 333 1234567;caldo;Richiesta preventivo e focus ecommerce.;Retail fashion;prospect;Inviare offerta
+ZDevolite Demo 02;ZBeta Group S.p.A.;IT23456789012;Giulia Bianchi;giulia.bianchi@betagroup.it;+39 02 7654321;tiepido;Interessati a sito vetrina con form contatti.;Servizi;lead;Prenotare call
+ZDevolite Demo 03;ZGamma Tech Srl;IT34567890123;Luca Verdi;luca.verdi@gammatech.it;+39 347 7654321;freddo;Da ricontattare tra 2 settimane.;Software;lead;Inviare mail
+ZDevolite Demo 04;ZDelta Food SRL;IT45678901234;Sara Neri;sara.neri@deltafood.it;+39 349 1122334;bollente;Hanno urgenza per messa online entro 30 giorni.;Food;prospect;Preventivo entro oggi
+ZDevolite Demo 05;ZEpsilon Moda Srl;IT56789012345;Alessandro Gallo;alessandro.gallo@epsilonmoda.it;+39 345 9988776;disqualificato;Budget non compatibile al momento.;Fashion;lead;Archiviare
+
+ZDevolite Mini 01;ZZeta Home Srl;;;;;;;;
+ZDevolite Mini 02;ZEta Consulting Srl;;;;;;;;
+ZDevolite Mini 03;ZTheta Market Srl;;;;;;;;
+ZDevolite Mini 04;ZIota Studio Srl;;;;;;;;
+ZDevolite Mini 05;ZKappa Logistics Srl;;;;;;;;

@@ -1,4 +1,362 @@
 (function () {
+  const readCsrf = () => {
+    const headerName = document.querySelector('#csrfHeader')?.value;
+    const token = document.querySelector('input[name="_csrf"]')?.value;
+    if (!headerName || !token) return null;
+    return { headerName, token };
+  };
+
+  const formatDate = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const initPipelinesModal = () => {
+    const pipelinesModal = document.querySelector('[data-pipelines-modal]');
+    const openPipelinesBtn = document.querySelector('[data-open-pipelines]');
+    if (!pipelinesModal || !openPipelinesBtn) return;
+
+    const pipelineList = pipelinesModal.querySelector('[data-pipeline-list]');
+    const pipelineSearch = pipelinesModal.querySelector('[data-pipeline-search]');
+    const pipelineSortBy = pipelinesModal.querySelector('[data-pipeline-sort-by]');
+    const pipelineSortDir = pipelinesModal.querySelector('[data-pipeline-sort-dir]');
+    const pipelineOpen = pipelinesModal.querySelector('[data-pipeline-open]');
+    const pipelineStatus = pipelinesModal.querySelector('[data-pipeline-status]');
+    const uploadName = pipelinesModal.querySelector('[data-pipeline-upload-name]');
+    const uploadFile = pipelinesModal.querySelector('[data-pipeline-upload-file]');
+    const uploadBtn = pipelinesModal.querySelector('[data-pipeline-upload-btn]');
+    const uploadStatus = pipelinesModal.querySelector('[data-pipeline-upload-status]');
+    const closeButtons = Array.from(pipelinesModal.querySelectorAll('[data-modal-close-pipelines]'));
+
+    let cachedPipelines = [];
+    let fetchTimer = null;
+
+    const render = (items) => {
+      if (!pipelineList) return;
+      pipelineList.innerHTML = '';
+      if (!items || !items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'modal-empty';
+        empty.textContent = 'Nessuna pipeline trovata.';
+        pipelineList.appendChild(empty);
+        return;
+      }
+      items.forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'modal-item';
+        const title = document.createElement('div');
+        title.className = 'modal-item__title';
+        title.textContent = item.pipelineName || 'Senza nome';
+        const meta = document.createElement('div');
+        meta.className = 'modal-item__meta';
+        const file = document.createElement('span');
+        file.textContent = item.originalFilename ? `File: ${item.originalFilename}` : 'File: -';
+        const counts = document.createElement('span');
+        const active = Number(item.activeRowCount || 0);
+        const done = Number(item.doneCount || 0);
+        counts.className = 'modal-tag';
+        counts.textContent = `${done}/${active} fatte`;
+        const time = document.createElement('span');
+        time.textContent = formatDate(item.createdAt || item.updatedAt);
+        meta.append(file, counts, time);
+        el.append(title, meta);
+        el.addEventListener('click', () => {
+          if (item.pipelineId) {
+            window.location.href = `/pipelines/${encodeURIComponent(item.pipelineId)}`;
+          }
+        });
+        pipelineList.appendChild(el);
+      });
+    };
+
+    const buildQuery = () => {
+      const params = new URLSearchParams();
+      params.set('limit', '200');
+      const q = (pipelineSearch?.value || '').trim();
+      const sortBy = pipelineSortBy?.value || 'createdAt';
+      const sortDir = pipelineSortDir?.value || 'desc';
+      if (q) params.set('q', q);
+      params.set('sortBy', sortBy);
+      params.set('sortDir', sortDir);
+      return params.toString();
+    };
+
+    const fetchPipelines = async () => {
+      if (!pipelineList) return;
+      pipelineList.innerHTML = '<div class="modal-empty">Caricamento...</div>';
+      if (pipelineStatus) pipelineStatus.textContent = '';
+      try {
+        const response = await fetch(`/pipelines/list?${buildQuery()}`, { headers: { 'Accept': 'application/json' } });
+        if (!response.ok) throw new Error('load failed');
+        cachedPipelines = await response.json();
+        render(cachedPipelines);
+      } catch (err) {
+        cachedPipelines = [];
+        pipelineList.innerHTML = '<div class="modal-empty">Errore nel caricamento delle pipeline.</div>';
+      }
+    };
+
+    const scheduleFetch = () => {
+      if (fetchTimer) window.clearTimeout(fetchTimer);
+      fetchTimer = window.setTimeout(fetchPipelines, 220);
+    };
+
+    const openModal = () => {
+      pipelinesModal.classList.add('is-open');
+      pipelinesModal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('modal-open');
+      if (pipelineSearch) pipelineSearch.value = '';
+      if (pipelineSortBy) pipelineSortBy.value = 'createdAt';
+      if (pipelineSortDir) pipelineSortDir.value = 'desc';
+      if (uploadStatus) uploadStatus.textContent = '';
+      fetchPipelines();
+      setTimeout(() => pipelineSearch?.focus(), 0);
+    };
+
+    const closeModal = () => {
+      pipelinesModal.classList.remove('is-open');
+      pipelinesModal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('modal-open');
+      if (pipelineStatus) pipelineStatus.textContent = '';
+      if (uploadStatus) uploadStatus.textContent = '';
+    };
+
+    const openByName = () => {
+      const value = (pipelineSearch?.value || '').trim().toLowerCase();
+      if (!value && cachedPipelines.length !== 1) {
+        if (pipelineStatus) pipelineStatus.textContent = 'Inserisci un criterio di ricerca oppure seleziona una pipeline dalla lista.';
+        return;
+      }
+      const match = cachedPipelines.find(item =>
+        (item.pipelineName || '').toLowerCase() === value
+        || (item.originalFilename || '').toLowerCase() === value
+      );
+      const target = match || (cachedPipelines.length === 1 ? cachedPipelines[0] : null);
+      if (target?.pipelineId) {
+        window.location.href = `/pipelines/${encodeURIComponent(target.pipelineId)}`;
+        return;
+      }
+      if (pipelineStatus) pipelineStatus.textContent = 'Nessuna pipeline corrisponde ai criteri di ricerca.';
+    };
+
+    const upload = async () => {
+      if (!uploadStatus) return;
+      uploadStatus.style.color = '#b54848';
+      uploadStatus.textContent = '';
+      const name = (uploadName?.value || '').trim();
+      const file = uploadFile?.files?.[0];
+      if (!name) {
+        uploadStatus.textContent = 'Inserisci un nome pipeline.';
+        return;
+      }
+      if (!file) {
+        uploadStatus.textContent = 'Seleziona un file CSV.';
+        return;
+      }
+      const csrf = readCsrf();
+      if (!csrf) {
+        uploadStatus.textContent = 'CSRF mancante. Ricarica la pagina.';
+        return;
+      }
+      const formData = new FormData();
+      formData.append('pipelineName', name);
+      formData.append('csvFile', file);
+      uploadStatus.textContent = 'Import in corso...';
+      try {
+        const resp = await fetch('/pipelines/upload', {
+          method: 'POST',
+          headers: { [csrf.headerName]: csrf.token, 'Accept': 'application/json' },
+          body: formData
+        });
+        const payload = await resp.json().catch(() => ({}));
+        if (!resp.ok || !payload.ok) {
+          uploadStatus.textContent = payload.error || "Errore durante l'import.";
+          return;
+        }
+        uploadStatus.style.color = '#2f6b39';
+        uploadStatus.textContent = 'Import completato.';
+        if (payload.pipelineId) {
+          window.location.href = `/pipelines/${encodeURIComponent(payload.pipelineId)}`;
+        } else {
+          fetchPipelines();
+        }
+      } catch (err) {
+        uploadStatus.textContent = "Errore durante l'import.";
+      }
+    };
+
+    openPipelinesBtn.addEventListener('click', openModal);
+    closeButtons.forEach(btn => btn.addEventListener('click', closeModal));
+    pipelinesModal.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && pipelinesModal.classList.contains('is-open')) closeModal();
+    });
+    pipelineSearch?.addEventListener('input', scheduleFetch);
+    pipelineSearch?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        openByName();
+      }
+    });
+    pipelineSortBy?.addEventListener('change', fetchPipelines);
+    pipelineSortDir?.addEventListener('change', fetchPipelines);
+    pipelineOpen?.addEventListener('click', openByName);
+    uploadBtn?.addEventListener('click', upload);
+  };
+
+  const initPipelinePage = () => {
+    const pipelineId = document.body?.dataset?.pipelineId;
+    const listEl = document.querySelector('[data-pipeline-row-list]');
+    if (!pipelineId || !listEl) return;
+
+    const searchEl = document.querySelector('[data-pipeline-row-search]');
+    const sortByEl = document.querySelector('[data-pipeline-row-sort-by]');
+    const sortDirEl = document.querySelector('[data-pipeline-row-sort-dir]');
+    const statusEl = document.querySelector('[data-pipeline-row-status]');
+
+    let fetchTimer = null;
+
+    const buildQuery = () => {
+      const params = new URLSearchParams();
+      params.set('limit', '500');
+      const q = (searchEl?.value || '').trim();
+      const sortBy = sortByEl?.value || 'rowNumber';
+      const sortDir = sortDirEl?.value || 'asc';
+      if (q) params.set('q', q);
+      params.set('sortBy', sortBy);
+      params.set('sortDir', sortDir);
+      return params.toString();
+    };
+
+    const openRow = (item) => {
+      if (!item) return;
+      if (item.doneProjectId) {
+        // Open as "Modifica scheda esistente" when already saved.
+        window.open(`/intake?projectId=${encodeURIComponent(item.doneProjectId)}`, '_blank', 'noopener');
+        return;
+      }
+      window.open(`/intake?pipelineRowId=${encodeURIComponent(item.rowId)}`, '_blank', 'noopener');
+    };
+
+    const deleteRow = async (rowId) => {
+      const ok = window.confirm('Vuoi cancellare questa riga dalla pipeline? (soft delete)');
+      if (!ok) return;
+      const csrf = readCsrf();
+      if (!csrf) return;
+      try {
+        const resp = await fetch(`/pipelines/rows/${encodeURIComponent(rowId)}/delete`, {
+          method: 'POST',
+          headers: { [csrf.headerName]: csrf.token, 'Accept': 'application/json' }
+        });
+        await resp.json().catch(() => ({}));
+        fetchRows();
+      } catch (err) {
+        if (statusEl) statusEl.textContent = 'Errore nella cancellazione della riga.';
+      }
+    };
+
+    const render = (items) => {
+      listEl.innerHTML = '';
+      if (!items || !items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'modal-empty';
+        empty.textContent = 'Nessuna riga trovata.';
+        listEl.appendChild(empty);
+        return;
+      }
+      items.forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'modal-item';
+        const title = document.createElement('div');
+        title.className = 'modal-item__title';
+        title.textContent = `#${item.rowNumber} - ${item.projectName || 'Senza nome'}`;
+
+        const meta = document.createElement('div');
+        meta.className = 'modal-item__meta';
+        const company = document.createElement('span');
+        company.textContent = item.companyName ? `Azienda: ${item.companyName}` : 'Azienda: -';
+        const temp = document.createElement('span');
+        temp.className = 'modal-tag';
+        temp.textContent = item.crmTemperature ? `Temp: ${item.crmTemperature}` : 'Temp: -';
+        const done = document.createElement('span');
+        done.className = 'modal-tag';
+        done.textContent = item.done ? 'Fatto' : 'Da fare';
+        const time = document.createElement('span');
+        time.textContent = formatDate(item.updatedAt || item.createdAt);
+        meta.append(company, temp, done, time);
+
+        const detail = document.createElement('div');
+        detail.className = 'modal-item__detail';
+        const contact = document.createElement('span');
+        contact.textContent = item.contactFullName ? `Contatto: ${item.contactFullName}` : 'Contatto: -';
+        const email = document.createElement('span');
+        email.textContent = item.contactEmail ? `Email: ${item.contactEmail}` : 'Email: -';
+        const phone = document.createElement('span');
+        phone.textContent = item.contactPhone ? `Tel: ${item.contactPhone}` : 'Tel: -';
+        detail.append(contact, email, phone);
+
+        const actions = document.createElement('div');
+        actions.style.display = 'flex';
+        actions.style.justifyContent = 'flex-end';
+        actions.style.gap = '8px';
+
+        const openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.className = 'secondary secondary--ghost';
+        openBtn.textContent = 'Apri form';
+        openBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (item.rowId) openRow(item);
+        });
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'secondary';
+        delBtn.textContent = 'Cancella';
+        delBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (item.rowId) deleteRow(item.rowId);
+        });
+
+        actions.append(openBtn, delBtn);
+
+        el.append(title, meta, detail, actions);
+        el.addEventListener('click', () => {
+          if (item.rowId) openRow(item);
+        });
+        listEl.appendChild(el);
+      });
+    };
+
+    const fetchRows = async () => {
+      listEl.innerHTML = '<div class="modal-empty">Caricamento...</div>';
+      if (statusEl) statusEl.textContent = '';
+      try {
+        const resp = await fetch(`/pipelines/${encodeURIComponent(pipelineId)}/rows?${buildQuery()}`, { headers: { 'Accept': 'application/json' } });
+        if (!resp.ok) throw new Error('load failed');
+        const items = await resp.json();
+        render(items);
+      } catch (err) {
+        listEl.innerHTML = '<div class="modal-empty">Errore nel caricamento delle righe.</div>';
+      }
+    };
+
+    const scheduleFetch = () => {
+      if (fetchTimer) window.clearTimeout(fetchTimer);
+      fetchTimer = window.setTimeout(fetchRows, 220);
+    };
+
+    searchEl?.addEventListener('input', scheduleFetch);
+    sortByEl?.addEventListener('change', fetchRows);
+    sortDirEl?.addEventListener('change', fetchRows);
+
+    fetchRows();
+  };
+
+  initPipelinesModal();
+  initPipelinePage();
+
   const sections = Array.from(document.querySelectorAll('main section.card[id]'));
   const links = Array.from(document.querySelectorAll('.side nav a[data-section]'));
 

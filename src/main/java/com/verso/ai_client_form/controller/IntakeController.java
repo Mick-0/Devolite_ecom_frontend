@@ -22,15 +22,18 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import com.verso.ai_client_form.model.IntakeForm;
 import com.verso.ai_client_form.model.ProjectSummary;
 import com.verso.ai_client_form.service.IntakeService;
+import com.verso.ai_client_form.service.PipelineService;
 import jakarta.validation.Valid;
 
 @Controller
 public class IntakeController {
 
     private final IntakeService intakeService;
+    private final PipelineService pipelineService;
 
-    public IntakeController(IntakeService intakeService) {
+    public IntakeController(IntakeService intakeService, PipelineService pipelineService) {
         this.intakeService = intakeService;
+        this.pipelineService = pipelineService;
     }
 
     @GetMapping("/")
@@ -42,6 +45,7 @@ public class IntakeController {
     public String showForm(@RequestParam(value = "projectId", required = false) UUID projectId,
                            @RequestParam(value = "projectName", required = false) String projectName,
                            @RequestParam(value = "draftId", required = false) UUID draftId,
+                           @RequestParam(value = "pipelineRowId", required = false) UUID pipelineRowId,
                            @RequestParam(value = "enforceLock", required = false) Boolean enforceLockOverride,
                            @ModelAttribute("prefill") IntakeForm prefill,
                            Model model) {
@@ -54,6 +58,11 @@ public class IntakeController {
             }
         }
         IntakeForm form = (resolvedProjectId != null) ? intakeService.load(resolvedProjectId) : new IntakeForm();
+        if (pipelineRowId != null) {
+            IntakeForm pipelinePrefill = pipelineService.buildPrefillFromRow(pipelineRowId);
+            applyPrefill(form, pipelinePrefill);
+            form.setPipelineRowId(pipelineRowId);
+        }
         applyPrefill(form, prefill);
         UUID resolvedDraftId = intakeService.resolveDraftId(draftId, resolvedProjectId);
         form.setDraftId(resolvedDraftId);

@@ -51,6 +51,7 @@
           <h2>Scheda Cliente</h2>
         </div>
         <div class="header-actions">
+          <button type="button" class="secondary" data-open-pipelines>Pipelines</button>
           <button type="button" class="secondary" data-open-existing>Modifica scheda esistente</button>
           <form th:action="@{/logout}" method="post" class="logout-form">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
@@ -62,12 +63,13 @@
       <div class="form-alert form-alert--error" th:if="${projectLookupError}">
         [[${projectLookupError}]]
       </div>
-      <form id="intakeForm" class="intake-form" th:action="@{/intake}" th:object="${form}" method="post" enctype="multipart/form-data">
-        <input type="hidden" th:field="*{companyId}" />
-        <input type="hidden" th:field="*{projectId}" id="projectId" />
-        <input type="hidden" th:field="*{draftId}" id="draftId" />
-        <input type="hidden" id="csrfHeader" th:value="${_csrf.headerName}" />
-        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+       <form id="intakeForm" class="intake-form" th:action="@{/intake}" th:object="${form}" method="post" enctype="multipart/form-data">
+         <input type="hidden" th:field="*{companyId}" />
+         <input type="hidden" th:field="*{projectId}" id="projectId" />
+         <input type="hidden" th:field="*{draftId}" id="draftId" />
+         <input type="hidden" th:field="*{pipelineRowId}" />
+         <input type="hidden" id="csrfHeader" th:value="${_csrf.headerName}" />
+         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
         <div class="form-alert" th:if="${#fields.hasErrors()}">
           Completa i campi obbligatori evidenziati prima di salvare.
         </div>
@@ -628,6 +630,68 @@
           </div>
           <div class="modal-status" data-project-status></div>
           <div class="modal-list" data-project-list>
+            <div class="modal-empty">Caricamento...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal" id="pipelinesModal" data-pipelines-modal aria-hidden="true">
+        <div class="modal-backdrop" data-modal-close-pipelines></div>
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pipelinesTitle">
+          <div class="modal-header">
+            <h3 id="pipelinesTitle">Pipelines</h3>
+            <button type="button" class="icon-button" data-modal-close-pipelines aria-label="Chiudi">&times;</button>
+          </div>
+          <p class="modal-subtitle">
+            Importa un CSV separato da <strong>;</strong> (header obbligatorio). Header supportati:
+            <code>project_name</code>, <code>company_legal_name</code>, <code>vat_number</code>, <code>contact_full_name</code>,
+            <code>contact_email</code>, <code>contact_phone</code>, <code>crm_temperature</code>, <code>crm_notes</code>,
+            <code>crm_sector</code>, <code>crm_current_stage</code>, <code>crm_cta</code>.
+            Obbligatori: <code>project_name</code> e <code>company_legal_name</code>.
+          </p>
+
+          <div class="card" style="box-shadow:none; border:1px solid var(--line); margin-bottom:14px;">
+            <div class="grid" style="grid-template-columns: 1.2fr 1fr auto;">
+              <div class="field" style="margin:0;">
+                <label>Nome pipeline</label>
+                <input type="text" data-pipeline-upload-name placeholder="Pipeline Aprile 2026" />
+              </div>
+              <div class="field" style="margin:0;">
+                <label>CSV</label>
+                <input type="file" data-pipeline-upload-file accept=".csv,text/csv" />
+              </div>
+              <div class="field" style="margin:0; display:flex; align-items:end;">
+                <button type="button" class="primary" data-pipeline-upload-btn>Aggiungi nuova pipeline</button>
+              </div>
+            </div>
+            <div class="modal-status" data-pipeline-upload-status></div>
+          </div>
+
+          <div class="modal-search">
+            <input type="text" data-pipeline-search placeholder="Cerca per nome pipeline o file" />
+            <button type="button" class="secondary" data-pipeline-open>Apri</button>
+          </div>
+          <div class="modal-filters">
+            <div class="field">
+              <label for="pipelineSortBy">Ordina per</label>
+              <select id="pipelineSortBy" data-pipeline-sort-by>
+                <option value="createdAt">Più recente</option>
+                <option value="pipelineName">Nome</option>
+                <option value="activeRowCount">Righe attive</option>
+                <option value="doneCount">Fatte</option>
+                <option value="updatedAt">Aggiornamento</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="pipelineSortDir">Direzione</label>
+              <select id="pipelineSortDir" data-pipeline-sort-dir>
+                <option value="desc">Decrescente</option>
+                <option value="asc">Crescente</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-status" data-pipeline-status></div>
+          <div class="modal-list" data-pipeline-list>
             <div class="modal-empty">Caricamento...</div>
           </div>
         </div>
