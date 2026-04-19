@@ -1,0 +1,11 @@
+**/build
+**/.gradle
+**/.idea
+**/.vscode
+**/bin
+**/*.iml
+storage
+scripts/sql
+scripts/csv
+README-DEPLOY.md
+

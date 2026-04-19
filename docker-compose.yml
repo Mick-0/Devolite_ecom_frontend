@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: acf-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-acf_db_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-acf_prod_app_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_ME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    build: .
+    container_name: acf-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-acf_db_prod}
+      DB_USER: ${POSTGRES_USER:-acf_prod_app_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_ME}
+      APP_PORT: 8080
+      APP_STORAGE_ROOT: /var/app/storage
+      APP_ADMIN_USERNAME: ${APP_ADMIN_USERNAME:-admin}
+      APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-CHANGE_ME_ADMIN}
+      APP_ADMIN_EMAIL: ${APP_ADMIN_EMAIL:-admin@example.com}
+      APP_REQUIRE_HTTPS: ${APP_REQUIRE_HTTPS:-false}
+      APP_TRUST_FORWARDED_HEADERS: ${APP_TRUST_FORWARDED_HEADERS:-true}
+      APP_ASSETS_VERSION: ${APP_ASSETS_VERSION:-1}
+    volumes:
+      - app_storage:/var/app/storage
+    ports:
+      # expose only on localhost; Plesk/NGINX will reverse-proxy to this
+      - "127.0.0.1:${APP_HTTP_PORT:-18080}:8080"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  app_storage:
+
