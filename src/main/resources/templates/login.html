@@ -10,7 +10,7 @@
   <link rel="icon" href="/favicon_io/favicon.ico" sizes="any" />
   <link rel="manifest" href="/favicon_io/site.webmanifest" />
 
-<link rel="stylesheet" th:href="@{/css/app.css}" />
+<link rel="stylesheet" th:href="@{/css/app.css(v=${@environment.getProperty('app.assets.version','1')})}" />
 </head>
 <body class="login-page">
   <div class="app" style="grid-template-columns: 1fr; max-width: 520px;">

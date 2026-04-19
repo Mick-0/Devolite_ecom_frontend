@@ -10,7 +10,7 @@
   <link rel="icon" href="/favicon_io/favicon.ico" sizes="any" />
   <link rel="manifest" href="/favicon_io/site.webmanifest" />
 
-  <link rel="stylesheet" th:href="@{/css/app.css}" />
+  <link rel="stylesheet" th:href="@{/css/app.css(v=${@environment.getProperty('app.assets.version','1')})}" />
 </head>
 <body data-pipeline-page="true" th:attr="data-pipeline-id=${pipeline.pipelineId}">
   <div class="app" style="grid-template-columns: 320px 1fr;">

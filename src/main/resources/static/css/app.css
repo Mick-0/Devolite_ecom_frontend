@@ -33,13 +33,13 @@ body::before {
   content: "";
   position: fixed;
   inset: 0;
+  /* Brand pattern background (kept subtle for readability) */
   background-image:
-    radial-gradient(1200px 800px at 20% 20%, rgba(125, 110, 176, 0.25), transparent 60%),
-    radial-gradient(1200px 800px at 80% 0%, rgba(68, 56, 119, 0.2), transparent 55%),
-    repeating-linear-gradient(120deg, rgba(68, 56, 119, 0.18) 0 2px, transparent 2px 42px),
-    repeating-linear-gradient(240deg, rgba(255, 212, 218, 0.55) 0 2px, transparent 2px 52px);
-  background-size: 100% 100%;
-  background-position: center;
+    linear-gradient(180deg, rgba(247, 243, 251, 0.05), rgba(247, 243, 251, 0.72)),
+    url("/assets/brand/Pattern-Sito.png");
+  background-size: 100% 100%, cover;
+  background-position: center, center top;
+  background-repeat: no-repeat;
   pointer-events: none;
   z-index: 0;
 }
@@ -184,11 +184,20 @@ body::before {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 18px;
+
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(125, 110, 176, 0.25);
+  border-radius: 18px;
+  padding: 14px 16px;
+  box-shadow: 0 10px 28px rgba(31, 31, 27, 0.06);
+  backdrop-filter: blur(6px);
 }
 
 .header h2 {
   font-size: 28px;
   margin: 0;
+  color: var(--ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .badge {
