@@ -38,7 +38,7 @@ public class IntakeController {
 
     @GetMapping("/")
     public String root() {
-        return "redirect:/intake";
+        return "redirect:/dashboard";
     }
 
     @GetMapping("/intake")

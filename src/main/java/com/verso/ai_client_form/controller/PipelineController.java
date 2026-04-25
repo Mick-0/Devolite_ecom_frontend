@@ -43,6 +43,11 @@ public class PipelineController {
         return "pipeline";
     }
 
+    @GetMapping("/pipelines")
+    public String listPipelinesPage() {
+        return "pipelines-list";
+    }
+
     @PostMapping(path = "/pipelines/{pipelineId}/rename", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public ResponseEntity<Map<String, Object>> rename(@PathVariable("pipelineId") UUID pipelineId,

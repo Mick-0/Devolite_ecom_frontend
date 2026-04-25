@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="it" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Devolite | Liste Pipelines</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="/favicon_io/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon_io/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon_io/favicon-16x16.png" />
+  <link rel="icon" href="/favicon_io/favicon.ico" sizes="any" />
+  <link rel="manifest" href="/favicon_io/site.webmanifest" />
+  <link rel="stylesheet" th:href="@{/css/app.css(v=${@environment.getProperty('app.assets.version','1')})}" />
+</head>
+<body data-pipeline-index-page="true">
+  <div class="app" style="grid-template-columns: 1fr; max-width: 1100px;">
+    <main>
+      <div class="header">
+        <div>
+          <h2>Liste Pipelines</h2>
+          <div class="note">Consulta, ordina e apri le pipeline importate.</div>
+        </div>
+        <div class="header-actions">
+          <a class="secondary" href="/dashboard">Torna al pannello</a>
+        </div>
+      </div>
+
+      <section class="card">
+        <div class="modal-search" style="margin-bottom:12px;">
+          <input type="text" data-pipeline-index-search placeholder="Cerca per nome pipeline o file CSV" />
+          <button type="button" class="secondary" data-pipeline-index-open>Apri</button>
+        </div>
+        <div class="modal-filters">
+          <div class="field">
+            <label for="pipelineIndexSortBy">Ordina per</label>
+            <select id="pipelineIndexSortBy" data-pipeline-index-sort-by>
+              <option value="createdAt">Più recente</option>
+              <option value="pipelineName">Nome</option>
+              <option value="activeRowCount">Righe attive</option>
+              <option value="doneCount">Fatte</option>
+              <option value="updatedAt">Aggiornamento</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="pipelineIndexSortDir">Direzione</label>
+            <select id="pipelineIndexSortDir" data-pipeline-index-sort-dir>
+              <option value="desc">Decrescente</option>
+              <option value="asc">Crescente</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-status" data-pipeline-index-status></div>
+        <div class="modal-list" data-pipeline-index-list style="max-height: calc(100vh - 320px);">
+          <div class="modal-empty">Caricamento...</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script th:src="@{/js/app.js(v=${@environment.getProperty('app.assets.version','1')})}"></script>
+</body>
+</html>

@@ -205,6 +205,117 @@
     uploadBtn?.addEventListener('click', upload);
   };
 
+  const initPipelineIndexPage = () => {
+    const list = document.querySelector('[data-pipeline-index-list]');
+    if (!document.body?.dataset?.pipelineIndexPage || !list) return;
+
+    const search = document.querySelector('[data-pipeline-index-search]');
+    const sortBy = document.querySelector('[data-pipeline-index-sort-by]');
+    const sortDir = document.querySelector('[data-pipeline-index-sort-dir]');
+    const openBtn = document.querySelector('[data-pipeline-index-open]');
+    const status = document.querySelector('[data-pipeline-index-status]');
+    let cached = [];
+    let fetchTimer = null;
+
+    const buildQuery = () => {
+      const params = new URLSearchParams();
+      params.set('limit', '200');
+      const q = (search?.value || '').trim();
+      const currentSortBy = sortBy?.value || 'createdAt';
+      const currentSortDir = sortDir?.value || 'desc';
+      if (q) params.set('q', q);
+      params.set('sortBy', currentSortBy);
+      params.set('sortDir', currentSortDir);
+      return params.toString();
+    };
+
+    const render = (items) => {
+      list.innerHTML = '';
+      if (!items || !items.length) {
+        list.innerHTML = '<div class="modal-empty">Nessuna pipeline trovata.</div>';
+        return;
+      }
+      items.forEach((item) => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'modal-item';
+
+        const title = document.createElement('div');
+        title.className = 'modal-item__title';
+        title.textContent = item.pipelineName || 'Senza nome';
+
+        const meta = document.createElement('div');
+        meta.className = 'modal-item__meta';
+        const file = document.createElement('span');
+        file.textContent = item.originalFilename ? `File: ${item.originalFilename}` : 'File: -';
+        const active = document.createElement('span');
+        active.className = 'modal-tag';
+        active.textContent = `${Number(item.doneCount || 0)}/${Number(item.activeRowCount || 0)} fatte`;
+        const updated = document.createElement('span');
+        updated.textContent = formatDate(item.updatedAt || item.createdAt);
+        meta.append(file, active, updated);
+
+        card.append(title, meta);
+        card.addEventListener('click', () => {
+          if (item.pipelineId) {
+            window.location.href = `/pipelines/${encodeURIComponent(item.pipelineId)}`;
+          }
+        });
+        list.appendChild(card);
+      });
+    };
+
+    const fetchItems = async () => {
+      list.innerHTML = '<div class="modal-empty">Caricamento...</div>';
+      if (status) status.textContent = '';
+      try {
+        const response = await fetch(`/pipelines/list?${buildQuery()}`, { headers: { 'Accept': 'application/json' } });
+        if (!response.ok) throw new Error('load failed');
+        cached = await response.json();
+        render(cached);
+      } catch {
+        cached = [];
+        list.innerHTML = '<div class="modal-empty">Errore nel caricamento delle pipeline.</div>';
+      }
+    };
+
+    const scheduleFetch = () => {
+      if (fetchTimer) window.clearTimeout(fetchTimer);
+      fetchTimer = window.setTimeout(fetchItems, 220);
+    };
+
+    const openSelected = () => {
+      const value = (search?.value || '').trim().toLowerCase();
+      const match = cached.find((item) =>
+        (item.pipelineName || '').toLowerCase() === value
+        || (item.originalFilename || '').toLowerCase() === value
+      );
+      const target = match || (cached.length === 1 ? cached[0] : null);
+      if (target?.pipelineId) {
+        window.location.href = `/pipelines/${encodeURIComponent(target.pipelineId)}`;
+        return;
+      }
+      if (status) {
+        status.textContent = cached.length > 1
+          ? 'Sono presenti più risultati. Selezionane uno dalla lista.'
+          : 'Nessuna pipeline corrisponde ai criteri di ricerca.';
+      }
+    };
+
+    search?.addEventListener('input', scheduleFetch);
+    search?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        openSelected();
+      }
+    });
+    sortBy?.addEventListener('change', fetchItems);
+    sortDir?.addEventListener('change', fetchItems);
+    openBtn?.addEventListener('click', openSelected);
+
+    fetchItems();
+  };
+
   const initPipelinePage = () => {
     const pipelineId = document.body?.dataset?.pipelineId;
     const listEl = document.querySelector('[data-pipeline-row-list]');
@@ -666,7 +777,204 @@
     setView(currentView);
   };
 
+  const initExistingProjectsModal = () => {
+    const existingModal = document.querySelector('[data-existing-modal]');
+    const openExistingBtn = document.querySelector('[data-open-existing]');
+    const projectList = existingModal?.querySelector('[data-project-list]');
+    const projectSearch = existingModal?.querySelector('[data-project-search]');
+    const projectSortBy = existingModal?.querySelector('[data-project-sort-by]');
+    const projectSortDir = existingModal?.querySelector('[data-project-sort-dir]');
+    const projectOpen = existingModal?.querySelector('[data-project-open]');
+    const projectStatus = existingModal?.querySelector('[data-project-status]');
+    const modalCloseButtons = existingModal ? Array.from(existingModal.querySelectorAll('[data-modal-close]')) : [];
+    if (!openExistingBtn || !existingModal || !projectList) return;
+
+    let cachedProjects = [];
+    let projectFetchTimer = null;
+
+    const formatProjectDate = (value) => {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+
+    const projectKindLabels = { vetrina: 'Vetrina', ecommerce: 'E-commerce' };
+    const projectStatusLabels = {
+      in_discovery: 'In analisi',
+      onboarding: 'Avvio',
+      in_production: 'In produzione',
+      delivered: 'Consegnato',
+      archived: 'Archiviato'
+    };
+    const formatProjectKind = (value) => projectKindLabels[value] || value || '-';
+    const formatProjectStatus = (value) => projectStatusLabels[value] || value || '-';
+
+    const renderProjectList = (items) => {
+      projectList.innerHTML = '';
+      if (!items || !items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'modal-empty';
+        empty.textContent = 'Nessun progetto trovato.';
+        projectList.appendChild(empty);
+        return;
+      }
+      items.forEach(item => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'modal-item';
+        const title = document.createElement('div');
+        title.className = 'modal-item__title';
+        title.textContent = item.projectName || 'Senza nome';
+        const meta = document.createElement('div');
+        meta.className = 'modal-item__meta';
+        const company = document.createElement('span');
+        company.textContent = item.companyName || '-';
+        const kind = document.createElement('span');
+        kind.className = 'modal-tag';
+        kind.textContent = formatProjectKind(item.projectKind);
+        const status = document.createElement('span');
+        status.className = 'modal-tag';
+        status.textContent = formatProjectStatus(item.projectStatus);
+        const time = document.createElement('span');
+        time.textContent = formatProjectDate(item.updatedAt);
+        meta.append(company, kind, status, time);
+        const detail = document.createElement('div');
+        detail.className = 'modal-item__detail';
+        const contact = document.createElement('span');
+        contact.textContent = item.contactName ? `Referente: ${item.contactName}` : 'Referente: -';
+        const email = document.createElement('span');
+        email.textContent = item.contactEmail ? `Email: ${item.contactEmail}` : 'Email: -';
+        const vat = document.createElement('span');
+        vat.textContent = item.vatNumber ? `P.IVA: ${item.vatNumber}` : 'P.IVA: -';
+        const city = document.createElement('span');
+        city.textContent = item.city ? `Citta: ${item.city}` : 'Citta: -';
+        detail.append(contact, email, vat, city);
+        button.append(title, meta, detail);
+        button.addEventListener('click', () => {
+          if (item.projectId) {
+            window.location.href = `/intake?projectId=${encodeURIComponent(item.projectId)}`;
+          } else if (item.projectName) {
+            window.location.href = `/intake?projectName=${encodeURIComponent(item.projectName)}`;
+          }
+        });
+        projectList.appendChild(button);
+      });
+    };
+
+    const buildProjectQueryString = () => {
+      const params = new URLSearchParams();
+      params.set('limit', '100');
+      const query = (projectSearch?.value || '').trim();
+      const sortBy = projectSortBy?.value || 'updatedAt';
+      const sortDir = projectSortDir?.value || 'desc';
+      if (query) {
+        params.set('q', query);
+      }
+      params.set('sortBy', sortBy);
+      params.set('sortDir', sortDir);
+      return params.toString();
+    };
+
+    const fetchProjects = async () => {
+      projectList.innerHTML = '<div class="modal-empty">Caricamento...</div>';
+      if (projectStatus) projectStatus.textContent = '';
+      try {
+        const response = await fetch(`/intake/projects?${buildProjectQueryString()}`, {
+          headers: { 'Accept': 'application/json' }
+        });
+        if (!response.ok) {
+          throw new Error('load failed');
+        }
+        cachedProjects = await response.json();
+        renderProjectList(cachedProjects);
+      } catch {
+        cachedProjects = [];
+        projectList.innerHTML = '<div class="modal-empty">Errore nel caricamento dei progetti.</div>';
+      }
+    };
+
+    const scheduleProjectFetch = () => {
+      if (projectFetchTimer) {
+        window.clearTimeout(projectFetchTimer);
+      }
+      projectFetchTimer = window.setTimeout(fetchProjects, 220);
+    };
+
+    const openProjectModal = () => {
+      existingModal.classList.add('is-open');
+      existingModal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('modal-open');
+      if (projectSearch) {
+        projectSearch.value = '';
+        window.setTimeout(() => projectSearch.focus(), 0);
+      }
+      if (projectSortBy) {
+        projectSortBy.value = 'updatedAt';
+      }
+      if (projectSortDir) {
+        projectSortDir.value = 'desc';
+      }
+      fetchProjects();
+    };
+
+    const closeProjectModal = () => {
+      existingModal.classList.remove('is-open');
+      existingModal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('modal-open');
+      if (projectStatus) projectStatus.textContent = '';
+    };
+
+    const openProjectByName = () => {
+      const value = (projectSearch?.value || '').trim();
+      if (!value && !cachedProjects.length) {
+        if (projectStatus) projectStatus.textContent = 'Inserisci un criterio di ricerca oppure seleziona un progetto dalla lista.';
+        return;
+      }
+      const lowered = value.toLowerCase();
+      const match = cachedProjects.find(item =>
+        (item.projectName || '').toLowerCase() === lowered
+        || (item.companyName || '').toLowerCase() === lowered
+        || (item.vatNumber || '').toLowerCase() === lowered
+        || (item.contactEmail || '').toLowerCase() === lowered
+      );
+      if (match && match.projectId) {
+        window.location.href = `/intake?projectId=${encodeURIComponent(match.projectId)}`;
+        return;
+      }
+      if (cachedProjects.length === 1 && cachedProjects[0].projectId) {
+        window.location.href = `/intake?projectId=${encodeURIComponent(cachedProjects[0].projectId)}`;
+        return;
+      }
+      if (projectStatus) {
+        projectStatus.textContent = cachedProjects.length > 1
+          ? 'Sono presenti più risultati. Selezionane uno dalla lista.'
+          : 'Nessun progetto corrisponde ai criteri di ricerca.';
+      }
+    };
+
+    openExistingBtn.addEventListener('click', openProjectModal);
+    modalCloseButtons.forEach(btn => btn.addEventListener('click', closeProjectModal));
+    projectSearch?.addEventListener('input', scheduleProjectFetch);
+    projectSearch?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        openProjectByName();
+      }
+    });
+    projectSortBy?.addEventListener('change', fetchProjects);
+    projectSortDir?.addEventListener('change', fetchProjects);
+    projectOpen?.addEventListener('click', openProjectByName);
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && existingModal.classList.contains('is-open')) {
+        closeProjectModal();
+      }
+    });
+  };
+
   initPipelinesModal();
+  initExistingProjectsModal();
+  initPipelineIndexPage();
   initPipelinePage();
 
   const sections = Array.from(document.querySelectorAll('main section.card[id]'));
@@ -707,35 +1015,6 @@
   let maxUnlockedIndex = 0;
   let scrollLock = false;
 
-  const existingModal = document.querySelector('[data-existing-modal]');
-  const openExistingBtn = document.querySelector('[data-open-existing]');
-  const projectList = existingModal?.querySelector('[data-project-list]');
-  const projectSearch = existingModal?.querySelector('[data-project-search]');
-  const projectSortBy = existingModal?.querySelector('[data-project-sort-by]');
-  const projectSortDir = existingModal?.querySelector('[data-project-sort-dir]');
-  const projectOpen = existingModal?.querySelector('[data-project-open]');
-  const projectStatus = existingModal?.querySelector('[data-project-status]');
-  const modalCloseButtons = existingModal ? Array.from(existingModal.querySelectorAll('[data-modal-close]')) : [];
-  let cachedProjects = [];
-  let projectFetchTimer = null;
-
-  const formatProjectDate = (value) => {
-    if (!value) return '';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '';
-    return date.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
-  };
-
-  const projectKindLabels = { vetrina: 'Vetrina', ecommerce: 'E-commerce' };
-  const projectStatusLabels = {
-    in_discovery: 'In analisi',
-    onboarding: 'Avvio',
-    in_production: 'In produzione',
-    delivered: 'Consegnato',
-    archived: 'Archiviato'
-  };
-  const formatProjectKind = (value) => projectKindLabels[value] || value || '-';
-  const formatProjectStatus = (value) => projectStatusLabels[value] || value || '-';
   const getCurrentProjectKind = () => (projectKindField?.value || '').trim();
   const getApplicability = (element) => element?.dataset?.applicable || 'both';
   const isApplicableElement = (element) => {
@@ -762,183 +1041,6 @@
       ? 'Disponibile solo per siti vetrina'
       : 'Disponibile solo per progetti e-commerce';
   };
-
-  const renderProjectList = (items) => {
-    if (!projectList) return;
-    projectList.innerHTML = '';
-    if (!items || !items.length) {
-      const empty = document.createElement('div');
-      empty.className = 'modal-empty';
-      empty.textContent = 'Nessun progetto trovato.';
-      projectList.appendChild(empty);
-      return;
-    }
-    items.forEach(item => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'modal-item';
-      const title = document.createElement('div');
-      title.className = 'modal-item__title';
-      title.textContent = item.projectName || 'Senza nome';
-      const meta = document.createElement('div');
-      meta.className = 'modal-item__meta';
-      const company = document.createElement('span');
-      company.textContent = item.companyName || '-';
-      const kind = document.createElement('span');
-      kind.className = 'modal-tag';
-      kind.textContent = formatProjectKind(item.projectKind);
-      const status = document.createElement('span');
-      status.className = 'modal-tag';
-      status.textContent = formatProjectStatus(item.projectStatus);
-      const time = document.createElement('span');
-      time.textContent = formatProjectDate(item.updatedAt);
-      meta.append(company, kind, status, time);
-      const detail = document.createElement('div');
-      detail.className = 'modal-item__detail';
-      const contact = document.createElement('span');
-      contact.textContent = item.contactName ? `Referente: ${item.contactName}` : 'Referente: -';
-      const email = document.createElement('span');
-      email.textContent = item.contactEmail ? `Email: ${item.contactEmail}` : 'Email: -';
-      const vat = document.createElement('span');
-      vat.textContent = item.vatNumber ? `P.IVA: ${item.vatNumber}` : 'P.IVA: -';
-      const city = document.createElement('span');
-      city.textContent = item.city ? `Citta: ${item.city}` : 'Citta: -';
-      detail.append(contact, email, vat, city);
-      button.append(title, meta, detail);
-      button.addEventListener('click', () => {
-        if (item.projectId) {
-          window.location.href = `/intake?projectId=${encodeURIComponent(item.projectId)}`;
-        } else if (item.projectName) {
-          window.location.href = `/intake?projectName=${encodeURIComponent(item.projectName)}`;
-        }
-      });
-      projectList.appendChild(button);
-    });
-  };
-
-  const buildProjectQueryString = () => {
-    const params = new URLSearchParams();
-    params.set('limit', '100');
-    const query = (projectSearch?.value || '').trim();
-    const sortBy = projectSortBy?.value || 'updatedAt';
-    const sortDir = projectSortDir?.value || 'desc';
-    if (query) {
-      params.set('q', query);
-    }
-    params.set('sortBy', sortBy);
-    params.set('sortDir', sortDir);
-    return params.toString();
-  };
-
-  const scheduleProjectFetch = () => {
-    if (projectFetchTimer) {
-      window.clearTimeout(projectFetchTimer);
-    }
-    projectFetchTimer = window.setTimeout(() => {
-      fetchProjects();
-    }, 220);
-  };
-
-  const fetchProjects = async () => {
-    if (!projectList) return;
-    projectList.innerHTML = '<div class="modal-empty">Caricamento...</div>';
-    if (projectStatus) projectStatus.textContent = '';
-    try {
-      const response = await fetch(`/intake/projects?${buildProjectQueryString()}`, {
-        headers: { 'Accept': 'application/json' }
-      });
-      if (!response.ok) {
-        throw new Error('load failed');
-      }
-      cachedProjects = await response.json();
-      renderProjectList(cachedProjects);
-    } catch (err) {
-      cachedProjects = [];
-      projectList.innerHTML = '<div class="modal-empty">Errore nel caricamento dei progetti.</div>';
-    }
-  };
-
-  const openProjectModal = () => {
-    if (!existingModal) return;
-    existingModal.classList.add('is-open');
-    existingModal.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('modal-open');
-    if (projectSearch) {
-      projectSearch.value = '';
-      setTimeout(() => projectSearch.focus(), 0);
-    }
-    if (projectSortBy) {
-      projectSortBy.value = 'updatedAt';
-    }
-    if (projectSortDir) {
-      projectSortDir.value = 'desc';
-    }
-    fetchProjects();
-  };
-
-  const closeProjectModal = () => {
-    if (!existingModal) return;
-    existingModal.classList.remove('is-open');
-    existingModal.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('modal-open');
-    if (projectStatus) projectStatus.textContent = '';
-  };
-
-  const openProjectByName = () => {
-    const value = (projectSearch?.value || '').trim();
-    if (!value && !cachedProjects.length) {
-      if (projectStatus) projectStatus.textContent = 'Inserisci un criterio di ricerca oppure seleziona un progetto dalla lista.';
-      return;
-    }
-    const lowered = value.toLowerCase();
-    const match = cachedProjects.find(item =>
-      (item.projectName || '').toLowerCase() === lowered
-      || (item.companyName || '').toLowerCase() === lowered
-      || (item.vatNumber || '').toLowerCase() === lowered
-      || (item.contactEmail || '').toLowerCase() === lowered
-    );
-    if (match && match.projectId) {
-      window.location.href = `/intake?projectId=${encodeURIComponent(match.projectId)}`;
-      return;
-    }
-    if (cachedProjects.length === 1 && cachedProjects[0].projectId) {
-      window.location.href = `/intake?projectId=${encodeURIComponent(cachedProjects[0].projectId)}`;
-      return;
-    }
-    if (projectStatus) {
-      projectStatus.textContent = cachedProjects.length > 1
-        ? 'Sono presenti piu risultati. Selezionane uno dalla lista.'
-        : 'Nessun progetto corrisponde ai criteri di ricerca.';
-    }
-  };
-
-  if (openExistingBtn && existingModal) {
-    openExistingBtn.addEventListener('click', openProjectModal);
-    modalCloseButtons.forEach(btn => btn.addEventListener('click', closeProjectModal));
-    if (projectSearch) {
-      projectSearch.addEventListener('input', scheduleProjectFetch);
-      projectSearch.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
-          event.preventDefault();
-          openProjectByName();
-        }
-      });
-    }
-    if (projectSortBy) {
-      projectSortBy.addEventListener('change', fetchProjects);
-    }
-    if (projectSortDir) {
-      projectSortDir.addEventListener('change', fetchProjects);
-    }
-    if (projectOpen) {
-      projectOpen.addEventListener('click', openProjectByName);
-    }
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && existingModal.classList.contains('is-open')) {
-        closeProjectModal();
-      }
-    });
-  }
 
   const isFilled = (el) => {
     if (el.disabled || el.type === 'hidden') return false;

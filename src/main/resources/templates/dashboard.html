@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="it" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Devolite | Pannello di Controllo</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="/favicon_io/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon_io/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon_io/favicon-16x16.png" />
+  <link rel="icon" href="/favicon_io/favicon.ico" sizes="any" />
+  <link rel="manifest" href="/favicon_io/site.webmanifest" />
+  <link rel="stylesheet" th:href="@{/css/app.css(v=${@environment.getProperty('app.assets.version','1')})}" />
+</head>
+<body class="dashboard-page">
+  <div class="app" style="grid-template-columns: 1fr; max-width: 1120px;">
+    <main>
+      <div class="header dashboard-header">
+        <div>
+          <h2>Pannello di Controllo</h2>
+          <div class="note">Scegli rapidamente l'azione da eseguire.</div>
+        </div>
+        <div class="header-actions">
+          <form th:action="@{/logout}" method="post" class="logout-form">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+            <button type="submit" class="secondary secondary--ghost">Logout</button>
+          </form>
+        </div>
+      </div>
+
+      <section class="card dashboard-card">
+        <div class="dashboard-columns">
+          <section class="dashboard-section">
+            <div class="dashboard-section__head">
+              <h3>Gestione Lead</h3>
+              <p>Attività su campagne, import e liste di lavoro.</p>
+            </div>
+            <div class="dashboard-actions">
+              <button type="button" class="dashboard-action dashboard-action--placeholder" disabled>
+                <span class="dashboard-action__icon">✦</span>
+                <span class="dashboard-action__title">Gestione campagne</span>
+                <span class="dashboard-action__meta">Disponibile a breve</span>
+              </button>
+              <button type="button" class="dashboard-action" data-open-pipelines>
+                <span class="dashboard-action__icon">⇪</span>
+                <span class="dashboard-action__title">Carica pipeline</span>
+                <span class="dashboard-action__meta">Apre il pannello di import CSV</span>
+              </button>
+              <a class="dashboard-action" href="/pipelines">
+                <span class="dashboard-action__icon">☰</span>
+                <span class="dashboard-action__title">Liste pipelines</span>
+                <span class="dashboard-action__meta">Vai all'elenco completo delle pipeline</span>
+              </a>
+            </div>
+          </section>
+
+          <section class="dashboard-section">
+            <div class="dashboard-section__head">
+              <h3>Gestione Clienti</h3>
+              <p>Creazione schede, modifica e navigazione clienti.</p>
+            </div>
+            <div class="dashboard-actions">
+              <a class="dashboard-action" href="/intake">
+                <span class="dashboard-action__icon">＋</span>
+                <span class="dashboard-action__title">Crea Nuovo</span>
+                <span class="dashboard-action__meta">Apri una nuova scheda contatto</span>
+              </a>
+              <button type="button" class="dashboard-action" data-open-existing>
+                <span class="dashboard-action__icon">⌘</span>
+                <span class="dashboard-action__title">Pipeline Clienti</span>
+                <span class="dashboard-action__meta">Apri il pannello di ricerca schede esistenti</span>
+              </button>
+              <button type="button" class="dashboard-action dashboard-action--placeholder" disabled>
+                <span class="dashboard-action__icon">●</span>
+                <span class="dashboard-action__title">Clienti Attivi</span>
+                <span class="dashboard-action__meta">Disponibile a breve</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <div class="modal" id="existingProjectModal" data-existing-modal aria-hidden="true">
+        <div class="modal-backdrop" data-modal-close></div>
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="existingProjectTitle">
+          <div class="modal-header">
+            <h3 id="existingProjectTitle">Modifica form esistente</h3>
+            <button type="button" class="icon-button" data-modal-close aria-label="Chiudi">&times;</button>
+          </div>
+          <p class="modal-subtitle">Cerca per progetto, azienda, referente, email, partita IVA o citta e ordina la lista come preferisci.</p>
+          <div class="modal-search">
+            <input type="text" data-project-search placeholder="Cerca per progetto, azienda, referente, email, P.IVA o citta" />
+            <button type="button" class="secondary" data-project-open>Apri</button>
+          </div>
+          <div class="modal-filters">
+            <div class="field">
+              <label for="projectSortBy">Ordina per</label>
+              <select id="projectSortBy" data-project-sort-by>
+                <option value="updatedAt">Ultimo aggiornamento</option>
+                <option value="projectName">Nome progetto</option>
+                <option value="companyName">Azienda</option>
+                <option value="projectStatus">Stato</option>
+                <option value="projectKind">Tipo progetto</option>
+                <option value="city">Citta</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="projectSortDir">Direzione</label>
+              <select id="projectSortDir" data-project-sort-dir>
+                <option value="desc">Decrescente</option>
+                <option value="asc">Crescente</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-status" data-project-status></div>
+          <div class="modal-list" data-project-list>
+            <div class="modal-empty">Caricamento...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal" id="pipelinesModal" data-pipelines-modal aria-hidden="true">
+        <div class="modal-backdrop" data-modal-close-pipelines></div>
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pipelinesTitle">
+          <div class="modal-header">
+            <h3 id="pipelinesTitle">Pipelines</h3>
+            <button type="button" class="icon-button" data-modal-close-pipelines aria-label="Chiudi">&times;</button>
+          </div>
+          <p class="modal-subtitle">
+            Importa un CSV separato da <strong>;</strong> (header obbligatorio). Header supportati:
+            <code>project_name</code>, <code>company_legal_name</code>, <code>vat_number</code>, <code>contact_full_name</code>,
+            <code>contact_email</code>, <code>contact_phone</code>, <code>crm_temperature</code>, <code>crm_notes</code>,
+            <code>crm_sector</code>, <code>crm_current_stage</code>, <code>crm_cta</code>.
+            Obbligatori: <code>project_name</code> e <code>company_legal_name</code>.
+          </p>
+
+          <div class="card" style="box-shadow:none; border:1px solid var(--line); margin-bottom:14px;">
+            <div class="grid" style="grid-template-columns: 1.2fr 1fr auto;">
+              <div class="field" style="margin:0;">
+                <label>Nome pipeline</label>
+                <input type="text" data-pipeline-upload-name placeholder="Pipeline Aprile 2026" />
+              </div>
+              <div class="field" style="margin:0;">
+                <label>CSV</label>
+                <input type="file" data-pipeline-upload-file accept=".csv,text/csv" />
+              </div>
+              <div class="field" style="margin:0; display:flex; align-items:end;">
+                <button type="button" class="primary" data-pipeline-upload-btn>Aggiungi nuova pipeline</button>
+              </div>
+            </div>
+            <div class="modal-status" data-pipeline-upload-status></div>
+          </div>
+
+          <div class="modal-search">
+            <input type="text" data-pipeline-search placeholder="Cerca per nome pipeline o file" />
+            <button type="button" class="secondary" data-pipeline-open>Apri</button>
+          </div>
+          <div class="modal-filters">
+            <div class="field">
+              <label for="pipelineSortBy">Ordina per</label>
+              <select id="pipelineSortBy" data-pipeline-sort-by>
+                <option value="createdAt">Più recente</option>
+                <option value="pipelineName">Nome</option>
+                <option value="activeRowCount">Righe attive</option>
+                <option value="doneCount">Fatte</option>
+                <option value="updatedAt">Aggiornamento</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="pipelineSortDir">Direzione</label>
+              <select id="pipelineSortDir" data-pipeline-sort-dir>
+                <option value="desc">Decrescente</option>
+                <option value="asc">Crescente</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-status" data-pipeline-status></div>
+          <div class="modal-list" data-pipeline-list>
+            <div class="modal-empty">Caricamento...</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <input type="hidden" id="csrfHeader" th:value="${_csrf.headerName}" />
+  <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+  <script th:src="@{/js/app.js(v=${@environment.getProperty('app.assets.version','1')})}"></script>
+</body>
+</html>
