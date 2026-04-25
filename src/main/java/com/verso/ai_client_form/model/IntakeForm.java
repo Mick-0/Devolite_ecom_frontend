@@ -135,7 +135,31 @@ public class IntakeForm {
 
     private Boolean hasExistingDomain;
     private String existingDomain;
+    private String existingDomainRegistrar;
+    private String existingDomainDnsProvider;
+    private Boolean existingDomainHasCredentials;
+    private String existingDomainCredentialUsername;
+    private String existingDomainCredentialEmail;
+    private String existingDomainCredentialSecret;
+    private Boolean existingDomainTwoFactorEnabled;
+    private String existingDomainNameservers;
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate existingDomainExpiryDate;
+    private Boolean existingDomainTransferLocked;
+
     private String domainToRegister;
+    private String alternativeDomainToRegister;
+    private String newDomainRegistrar;
+    private String newDomainCredentialUsername;
+    private String newDomainCredentialEmail;
+    private String newDomainCredentialSecret;
+    private Boolean willingToRegisterNewDomain;
+    private String domainIssues;
+    private Integer domainProblemSeverity;
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+    private LocalDateTime domainReachabilityCheckedAt;
+    private String domainReachabilityStatus;
+    private String domainReachabilityDetails;
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private LocalDateTime domainPurchaseStartedAt;
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
@@ -175,18 +199,34 @@ public class IntakeForm {
     private Integer aiSeoCreditsTotal;
     private Integer aiSeoCreditsUsed;
 
-    private Boolean purchaseEnabled;
-    private Boolean autoRenewalEnabled;
-    private Boolean ridEnabled;
-    private Boolean csvImportEnabled;
-    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-    private LocalDateTime csvImportInstructionsSentAt;
-    private Integer productCount;
-    private Boolean productHasVariants;
-    private List<String> paymentMethods;
-    private List<String> carriers;
-    private String productCategories;
+	    private Boolean purchaseEnabled;
+	    private Boolean autoRenewalEnabled;
+	    private Boolean ridEnabled;
+	    private Boolean csvImportEnabled;
+	    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+	    private LocalDateTime csvImportInstructionsSentAt;
+	    private Integer productCount;
+	    private Boolean productHasVariants;
+	    @Pattern(regexp = "^(?:product_with_variants|separate_products)?$", message = "Seleziona una gestione varianti valida.")
+	    private String variantManagementMode;
+	    private String variantAxes;
+	    private Integer variantTotalSkuCount;
+	    private Integer variantSeparateProductCount;
+	    private Boolean variantsAffectPrice;
+	    private Boolean variantsAffectStock;
 
+	    private String ecomPanelPlatform;
+	    private String ecomPanelUrl;
+	    private Boolean ecomPanelHasCredentials;
+	    private String ecomPanelCredentialEmail;
+	    private String ecomPanelCredentialUsername;
+	    private String ecomPanelCredentialSecret;
+	    private Boolean ecomPanelTwoFactorEnabled;
+	    private String ecomPanelNotes;
+	    private List<String> paymentMethods;
+	    private List<String> carriers;
+	    private String productCategories;
+	
     private MultipartFile logoFile;
     private String logoComment;
     private MultipartFile visuraFile;

@@ -40,6 +40,21 @@ public class PipelineRepository {
         return id;
     }
 
+    public int renameImport(UUID importId, String newName) {
+        if (importId == null) {
+            return 0;
+        }
+        String name = newName == null ? "" : newName.trim();
+        if (name.isBlank()) {
+            return 0;
+        }
+        String sql = "update pipeline.pipeline_import set pipeline_name = :name where id = :id";
+        return jdbc.update(sql, new MapSqlParameterSource()
+            .addValue("id", importId)
+            .addValue("name", name)
+        );
+    }
+
     public void insertRows(UUID importId, List<RowInsert> rows) {
         if (rows == null || rows.isEmpty()) {
             return;

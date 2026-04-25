@@ -210,6 +210,48 @@
     const listEl = document.querySelector('[data-pipeline-row-list]');
     if (!pipelineId || !listEl) return;
 
+    const renameInput = document.querySelector('[data-pipeline-rename-name]');
+    const renameBtn = document.querySelector('[data-pipeline-rename-save]');
+    const renameStatus = document.querySelector('[data-pipeline-rename-status]');
+    const setRenameStatus = (msg, isError) => {
+      if (!renameStatus) return;
+      renameStatus.textContent = msg || '';
+      renameStatus.style.color = isError ? '#b54848' : 'var(--muted)';
+    };
+    if (renameBtn && renameInput) {
+      renameBtn.addEventListener('click', async () => {
+        const name = String(renameInput.value || '').trim();
+        if (!name) {
+          setRenameStatus('Inserisci un nome pipeline.', true);
+          return;
+        }
+        const csrf = readCsrf();
+        if (!csrf) {
+          setRenameStatus('CSRF mancante: ricarica la pagina.', true);
+          return;
+        }
+        renameBtn.disabled = true;
+        setRenameStatus('Salvataggio...', false);
+        try {
+          const res = await fetch(`/pipelines/${encodeURIComponent(pipelineId)}/rename`, {
+            method: 'POST',
+            headers: { [csrf.headerName]: csrf.token, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ pipelineName: name })
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || data.ok === false) {
+            setRenameStatus(data.error || 'Errore durante la rinomina.', true);
+            return;
+          }
+          setRenameStatus('Nome aggiornato.', false);
+        } catch {
+          setRenameStatus('Errore durante la rinomina.', true);
+        } finally {
+          renameBtn.disabled = false;
+        }
+      });
+    }
+
     const searchEl = document.querySelector('[data-pipeline-row-search]');
     const sortByEl = document.querySelector('[data-pipeline-row-sort-by]');
     const sortDirEl = document.querySelector('[data-pipeline-row-sort-dir]');
@@ -1188,6 +1230,149 @@
     domainStart.addEventListener('input', syncDomain);
     domainEnd.addEventListener('input', syncDomain);
     syncDomain();
+  }
+
+  // Domain section: simplified visibility + suggestions + availability check.
+  const hasExisting = form.querySelector('[data-domain-has-existing]');
+  const hasCredentials = form.querySelector('[data-domain-has-credentials]');
+  const willingNew = form.querySelector('[data-domain-willing-new]');
+  const altField = document.querySelector('[data-domain-alt-field]');
+  const existingBlocks = Array.from(document.querySelectorAll('[data-domain-existing-fields]'));
+  const credentialBlocks = Array.from(document.querySelectorAll('[data-domain-credential-fields]'));
+  const newBlocks = Array.from(document.querySelectorAll('[data-domain-new-fields]'));
+  const applyDomainVisibility = () => {
+    const showExisting = !!(hasExisting && hasExisting.checked);
+    existingBlocks.forEach(el => (el.style.display = showExisting ? '' : 'none'));
+    newBlocks.forEach(el => (el.style.display = showExisting ? 'none' : ''));
+
+    const showCred = showExisting && !!(hasCredentials && hasCredentials.checked);
+    credentialBlocks.forEach(el => (el.style.display = showCred ? '' : 'none'));
+
+    const showAlt = !!(willingNew && willingNew.checked);
+    if (altField) altField.style.display = showAlt ? '' : 'none';
+  };
+  [hasExisting, hasCredentials, willingNew].forEach((el) => {
+    if (el) el.addEventListener('change', applyDomainVisibility);
+  });
+  applyDomainVisibility();
+
+  const hasVariants = form.querySelector('[data-has-variants]');
+  const variantBlocks = Array.from(form.querySelectorAll('[data-variant-fields]'));
+  const variantMode = form.querySelector('[data-variant-mode]');
+  const variantSeparateCount = form.querySelector('[data-variant-separate-count]');
+  const panelHasCreds = form.querySelector('[data-ecom-panel-has-credentials]');
+  const panelCredBlocks = Array.from(form.querySelectorAll('[data-ecom-panel-credential-fields]'));
+
+  const setBlockEnabled = (block, enabled) => {
+    if (!block) return;
+    block.style.display = enabled ? '' : 'none';
+    const inputs = Array.from(block.querySelectorAll('input, textarea, select'));
+    inputs.forEach((el) => {
+      el.disabled = !enabled;
+    });
+  };
+
+  const applyVariantsVisibility = () => {
+    const enabled = !!(hasVariants && hasVariants.checked);
+    variantBlocks.forEach((b) => setBlockEnabled(b, enabled));
+    if (!enabled) {
+      if (variantMode) variantMode.value = '';
+    }
+    const separate = enabled && (variantMode && variantMode.value === 'separate_products');
+    if (variantSeparateCount) {
+      setBlockEnabled(variantSeparateCount, separate);
+    }
+  };
+
+  const applyPanelVisibility = () => {
+    const enabled = !!(panelHasCreds && panelHasCreds.checked);
+    panelCredBlocks.forEach((b) => setBlockEnabled(b, enabled));
+  };
+
+  if (hasVariants) hasVariants.addEventListener('change', applyVariantsVisibility);
+  if (variantMode) variantMode.addEventListener('change', applyVariantsVisibility);
+  if (panelHasCreds) panelHasCreds.addEventListener('change', applyPanelVisibility);
+
+  applyVariantsVisibility();
+  applyPanelVisibility();
+
+  const suggestBtn = form.querySelector('[data-domain-suggest]');
+  const suggestQ = form.querySelector('[data-domain-suggest-q]');
+  const suggestResults = form.querySelector('[data-domain-suggest-results]');
+  const domainToRegister = form.querySelector('[data-domain-to-buy]');
+  const renderSuggestions = (items) => {
+    if (!suggestResults) return;
+    suggestResults.innerHTML = '';
+    (items || []).forEach((d) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'pill';
+      btn.textContent = d;
+      btn.addEventListener('click', () => {
+        if (domainToRegister) {
+          domainToRegister.value = d;
+          domainToRegister.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+      suggestResults.appendChild(btn);
+    });
+  };
+  if (suggestBtn && suggestQ && suggestResults) {
+    suggestBtn.addEventListener('click', async () => {
+      const q = (suggestQ.value || '').trim();
+      if (!q) {
+        renderSuggestions([]);
+        return;
+      }
+      suggestBtn.disabled = true;
+      try {
+        const res = await fetch(`/domain/suggest?q=${encodeURIComponent(q)}`, { headers: { 'Accept': 'application/json' } });
+        const data = await res.json();
+        renderSuggestions(Array.isArray(data) ? data : []);
+      } catch {
+        renderSuggestions([]);
+      } finally {
+        suggestBtn.disabled = false;
+      }
+    });
+  }
+
+  const availabilityBtn = form.querySelector('[data-domain-availability]');
+  const availabilityResult = form.querySelector('[data-domain-availability-result]');
+  const availabilityCheckedAt = form.querySelector('[data-domain-availability-checked-at]');
+  const availabilityStatus = form.querySelector('[data-domain-availability-status]');
+  const availabilityDetails = form.querySelector('[data-domain-availability-details]');
+  const toLocalIso = () => {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  };
+  const pickDomainToBuy = () => (domainToRegister ? String(domainToRegister.value || '').trim() : '');
+  if (availabilityBtn && availabilityResult) {
+    availabilityBtn.addEventListener('click', async () => {
+      const domain = pickDomainToBuy();
+      if (!domain) {
+        availabilityResult.textContent = 'Inserisci un dominio da verificare.';
+        return;
+      }
+      availabilityBtn.disabled = true;
+      availabilityResult.textContent = 'Verifica in corso...';
+      try {
+        const res = await fetch(`/domain/availability?domain=${encodeURIComponent(domain)}`, { headers: { 'Accept': 'application/json' } });
+        const data = await res.json();
+        const msg = data.message || 'Verifica completata';
+        availabilityResult.textContent = msg;
+        if (availabilityCheckedAt) availabilityCheckedAt.value = toLocalIso();
+        if (availabilityStatus) availabilityStatus.value = String(data.status || '');
+        if (availabilityDetails) availabilityDetails.value = String(data.details || '');
+      } catch {
+        availabilityResult.textContent = 'Errore durante la verifica.';
+        if (availabilityCheckedAt) availabilityCheckedAt.value = toLocalIso();
+        if (availabilityStatus) availabilityStatus.value = 'error';
+      } finally {
+        availabilityBtn.disabled = false;
+      }
+    });
   }
 
   const contractSent = form.querySelector('input[name="contractSentAt"]');

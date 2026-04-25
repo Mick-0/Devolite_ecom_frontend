@@ -11,6 +11,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
@@ -39,6 +40,22 @@ public class PipelineController {
         }
         model.addAttribute("pipeline", summary);
         return "pipeline";
+    }
+
+    @PostMapping(path = "/pipelines/{pipelineId}/rename", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> rename(@PathVariable("pipelineId") UUID pipelineId,
+                                                      @RequestBody Map<String, Object> body) {
+        Object raw = body == null ? null : body.get("pipelineName");
+        String name = raw == null ? null : raw.toString();
+        try {
+            pipelineService.renamePipeline(pipelineId, name);
+            return ResponseEntity.ok(Map.of("ok", true));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("ok", false, "error", ex.getMessage()));
+        } catch (Exception ex) {
+            return ResponseEntity.internalServerError().body(Map.of("ok", false, "error", "Errore durante la rinomina."));
+        }
     }
 
     @GetMapping(path = "/pipelines/list", produces = MediaType.APPLICATION_JSON_VALUE)

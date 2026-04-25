@@ -197,7 +197,28 @@ public class IntakeService {
         repo.upsertDomainSetup(projectId, map(
             "has_existing_domain", bool(form.getHasExistingDomain()),
             "existing_domain", form.getExistingDomain(),
+            "existing_registrar", emptyToNull(form.getExistingDomainRegistrar()),
+            "existing_dns_provider", emptyToNull(form.getExistingDomainDnsProvider()),
+            "existing_has_credentials", bool(form.getExistingDomainHasCredentials()),
+            "existing_credential_username", emptyToNull(form.getExistingDomainCredentialUsername()),
+            "existing_credential_email", emptyToNull(form.getExistingDomainCredentialEmail()),
+            "existing_credential_secret", emptyToNull(form.getExistingDomainCredentialSecret()),
+            "existing_two_factor_enabled", bool(form.getExistingDomainTwoFactorEnabled()),
+            "existing_nameservers", emptyToNull(form.getExistingDomainNameservers()),
+            "existing_expiry_date", form.getExistingDomainExpiryDate(),
+            "existing_transfer_locked", bool(form.getExistingDomainTransferLocked()),
             "domain_to_register", form.getDomainToRegister(),
+            "alternative_domain_to_register", emptyToNull(form.getAlternativeDomainToRegister()),
+            "new_registrar", emptyToNull(form.getNewDomainRegistrar()),
+            "new_credential_username", emptyToNull(form.getNewDomainCredentialUsername()),
+            "new_credential_email", emptyToNull(form.getNewDomainCredentialEmail()),
+            "new_credential_secret", emptyToNull(form.getNewDomainCredentialSecret()),
+            "willing_to_register_new_domain", bool(form.getWillingToRegisterNewDomain()),
+            "domain_issues", emptyToNull(form.getDomainIssues()),
+            "domain_problem_severity", form.getDomainProblemSeverity(),
+            "reachability_checked_at", form.getDomainReachabilityCheckedAt(),
+            "reachability_status", emptyToNull(form.getDomainReachabilityStatus()),
+            "reachability_details", emptyToNull(form.getDomainReachabilityDetails()),
             "domain_purchase_started_at", form.getDomainPurchaseStartedAt(),
             "domain_purchase_completed_at", form.getDomainPurchaseCompletedAt(),
             "preferred_mailbox", form.getPreferredMailbox(),
@@ -251,32 +272,87 @@ public class IntakeService {
             "seo_credits_used", seoUsed
         ));
 
-        if ("ecommerce".equalsIgnoreCase(projectKind)) {
-            repo.upsertSiteBrief(projectId, map(
-                "inspiration_sites", form.getInspirationSites(),
-                "requested_menu", form.getRequestedMenu(),
-                "copy_mode", emptyToNull(form.getCopyMode()),
-                "page_test_status", emptyToNull(form.getPageTestStatus()),
-                "has_existing_ecommerce", bool(form.getHasExistingEcommerce()),
-                "existing_ecommerce_url", emptyToNull(form.getExistingEcommerceUrl())
-            ));
-            Integer productCount = form.getProductCount();
-            if (productCount != null && productCount < 0) {
-                productCount = 0;
-            }
-            repo.upsertStoreSetup(projectId, map(
-                "purchase_enabled", bool(form.getPurchaseEnabled()),
-                "auto_renewal_enabled", bool(form.getAutoRenewalEnabled()),
-                "rid_enabled", bool(form.getRidEnabled()),
-                "csv_import_enabled", bool(form.getCsvImportEnabled()),
-                "csv_import_instructions_sent_at", form.getCsvImportInstructionsSentAt(),
-                "product_count", productCount,
-                "has_product_variants", bool(form.getProductHasVariants())
-            ));
-            repo.replacePaymentMethods(projectId, nullToEmpty(form.getPaymentMethods()));
-            repo.replaceCarriers(projectId, nullToEmpty(form.getCarriers()));
-            repo.replaceCategories(projectId, parseList(form.getProductCategories()));
-        }
+	        if ("ecommerce".equalsIgnoreCase(projectKind)) {
+	            repo.upsertSiteBrief(projectId, map(
+	                "inspiration_sites", form.getInspirationSites(),
+	                "requested_menu", form.getRequestedMenu(),
+	                "copy_mode", emptyToNull(form.getCopyMode()),
+	                "page_test_status", emptyToNull(form.getPageTestStatus()),
+	                "has_existing_ecommerce", bool(form.getHasExistingEcommerce()),
+	                "existing_ecommerce_url", emptyToNull(form.getExistingEcommerceUrl())
+	            ));
+	            Integer productCount = form.getProductCount();
+	            if (productCount != null && productCount < 0) {
+	                productCount = 0;
+	            }
+	            boolean hasVariants = bool(form.getProductHasVariants());
+	            String variantMode = emptyToNull(form.getVariantManagementMode());
+	            String variantAxes = emptyToNull(form.getVariantAxes());
+	            Integer variantTotalSku = form.getVariantTotalSkuCount();
+	            Integer variantSeparateProducts = form.getVariantSeparateProductCount();
+	            boolean variantsAffectPrice = bool(form.getVariantsAffectPrice());
+	            boolean variantsAffectStock = bool(form.getVariantsAffectStock());
+	            if (!hasVariants) {
+	                variantMode = null;
+	                variantAxes = null;
+	                variantTotalSku = null;
+	                variantSeparateProducts = null;
+	                variantsAffectPrice = false;
+	                variantsAffectStock = false;
+	            } else {
+	                if (variantTotalSku != null && variantTotalSku < 0) {
+	                    variantTotalSku = 0;
+	                }
+	                if (variantSeparateProducts != null && variantSeparateProducts < 0) {
+	                    variantSeparateProducts = 0;
+	                }
+	                if (!"separate_products".equalsIgnoreCase(variantMode)) {
+	                    variantSeparateProducts = null;
+	                }
+	            }
+
+	            boolean panelHasCreds = bool(form.getEcomPanelHasCredentials());
+	            String panelPlatform = emptyToNull(form.getEcomPanelPlatform());
+	            String panelUrl = emptyToNull(form.getEcomPanelUrl());
+	            String panelEmail = emptyToNull(form.getEcomPanelCredentialEmail());
+	            String panelUser = emptyToNull(form.getEcomPanelCredentialUsername());
+	            String panelSecret = emptyToNull(form.getEcomPanelCredentialSecret());
+	            boolean panel2fa = bool(form.getEcomPanelTwoFactorEnabled());
+	            String panelNotes = emptyToNull(form.getEcomPanelNotes());
+	            if (!panelHasCreds) {
+	                panelEmail = null;
+	                panelUser = null;
+	                panelSecret = null;
+	                panel2fa = false;
+	            }
+
+	            repo.upsertStoreSetup(projectId, map(
+	                "purchase_enabled", bool(form.getPurchaseEnabled()),
+	                "auto_renewal_enabled", bool(form.getAutoRenewalEnabled()),
+	                "rid_enabled", bool(form.getRidEnabled()),
+	                "csv_import_enabled", bool(form.getCsvImportEnabled()),
+	                "csv_import_instructions_sent_at", form.getCsvImportInstructionsSentAt(),
+	                "product_count", productCount,
+	                "has_product_variants", hasVariants,
+	                "variant_management_mode", variantMode,
+	                "variant_axes", variantAxes,
+	                "variant_total_sku_count", variantTotalSku,
+	                "variant_separate_product_count", variantSeparateProducts,
+	                "variants_affect_price", variantsAffectPrice,
+	                "variants_affect_stock", variantsAffectStock,
+	                "ecom_panel_platform", panelPlatform,
+	                "ecom_panel_url", panelUrl,
+	                "ecom_panel_has_credentials", panelHasCreds,
+	                "ecom_panel_credential_email", panelEmail,
+	                "ecom_panel_credential_username", panelUser,
+	                "ecom_panel_credential_secret", panelSecret,
+	                "ecom_panel_two_factor_enabled", panel2fa,
+	                "ecom_panel_notes", panelNotes
+	            ));
+	            repo.replacePaymentMethods(projectId, nullToEmpty(form.getPaymentMethods()));
+	            repo.replaceCarriers(projectId, nullToEmpty(form.getCarriers()));
+	            repo.replaceCategories(projectId, parseList(form.getProductCategories()));
+	        }
 
         handleFile(form.getLogoFile(), projectId, "logo", form.getLogoComment(), staffUserId);
         handleFile(form.getVisuraFile(), projectId, "documento_legale", form.getVisuraComment(), staffUserId);
@@ -520,7 +596,28 @@ public class IntakeService {
         repo.findDomainSetup(projectId).ifPresent(row -> {
             form.setHasExistingDomain(toBoolean(row.get("has_existing_domain")));
             form.setExistingDomain((String) row.get("existing_domain"));
+            form.setExistingDomainRegistrar((String) row.get("existing_registrar"));
+            form.setExistingDomainDnsProvider((String) row.get("existing_dns_provider"));
+            form.setExistingDomainHasCredentials(toBoolean(row.get("existing_has_credentials")));
+            form.setExistingDomainCredentialUsername((String) row.get("existing_credential_username"));
+            form.setExistingDomainCredentialEmail((String) row.get("existing_credential_email"));
+            // Do not prefill secrets back into the form.
+            form.setExistingDomainTwoFactorEnabled(toBoolean(row.get("existing_two_factor_enabled")));
+            form.setExistingDomainNameservers((String) row.get("existing_nameservers"));
+            form.setExistingDomainExpiryDate(toLocalDate(row.get("existing_expiry_date")));
+            form.setExistingDomainTransferLocked(toBoolean(row.get("existing_transfer_locked")));
             form.setDomainToRegister((String) row.get("domain_to_register"));
+            form.setAlternativeDomainToRegister((String) row.get("alternative_domain_to_register"));
+            form.setNewDomainRegistrar((String) row.get("new_registrar"));
+            form.setNewDomainCredentialUsername((String) row.get("new_credential_username"));
+            form.setNewDomainCredentialEmail((String) row.get("new_credential_email"));
+            // Do not prefill secrets back into the form.
+            form.setWillingToRegisterNewDomain(toBoolean(row.get("willing_to_register_new_domain")));
+            form.setDomainIssues((String) row.get("domain_issues"));
+            form.setDomainProblemSeverity(toInteger(row.get("domain_problem_severity")));
+            form.setDomainReachabilityCheckedAt(toLocalDateTime(row.get("reachability_checked_at")));
+            form.setDomainReachabilityStatus((String) row.get("reachability_status"));
+            form.setDomainReachabilityDetails((String) row.get("reachability_details"));
             form.setDomainPurchaseStartedAt(toLocalDateTime(row.get("domain_purchase_started_at")));
             form.setDomainPurchaseCompletedAt(toLocalDateTime(row.get("domain_purchase_completed_at")));
             form.setPreferredMailbox((String) row.get("preferred_mailbox"));
@@ -560,15 +657,29 @@ public class IntakeService {
             form.setAiSeoCreditsUsed(toInteger(row.get("seo_credits_used")));
         });
 
-        repo.findStoreSetup(projectId).ifPresent(row -> {
-            form.setPurchaseEnabled(toBoolean(row.get("purchase_enabled")));
-            form.setAutoRenewalEnabled(toBoolean(row.get("auto_renewal_enabled")));
-            form.setRidEnabled(toBoolean(row.get("rid_enabled")));
-            form.setCsvImportEnabled(toBoolean(row.get("csv_import_enabled")));
-            form.setCsvImportInstructionsSentAt(toLocalDateTime(row.get("csv_import_instructions_sent_at")));
-            form.setProductCount(toInteger(row.get("product_count")));
-            form.setProductHasVariants(toBoolean(row.get("has_product_variants")));
-        });
+	        repo.findStoreSetup(projectId).ifPresent(row -> {
+	            form.setPurchaseEnabled(toBoolean(row.get("purchase_enabled")));
+	            form.setAutoRenewalEnabled(toBoolean(row.get("auto_renewal_enabled")));
+	            form.setRidEnabled(toBoolean(row.get("rid_enabled")));
+	            form.setCsvImportEnabled(toBoolean(row.get("csv_import_enabled")));
+	            form.setCsvImportInstructionsSentAt(toLocalDateTime(row.get("csv_import_instructions_sent_at")));
+	            form.setProductCount(toInteger(row.get("product_count")));
+	            form.setProductHasVariants(toBoolean(row.get("has_product_variants")));
+	            form.setVariantManagementMode((String) row.get("variant_management_mode"));
+	            form.setVariantAxes((String) row.get("variant_axes"));
+	            form.setVariantTotalSkuCount(toInteger(row.get("variant_total_sku_count")));
+	            form.setVariantSeparateProductCount(toInteger(row.get("variant_separate_product_count")));
+	            form.setVariantsAffectPrice(toBoolean(row.get("variants_affect_price")));
+	            form.setVariantsAffectStock(toBoolean(row.get("variants_affect_stock")));
+	            form.setEcomPanelPlatform((String) row.get("ecom_panel_platform"));
+	            form.setEcomPanelUrl((String) row.get("ecom_panel_url"));
+	            form.setEcomPanelHasCredentials(toBoolean(row.get("ecom_panel_has_credentials")));
+	            form.setEcomPanelCredentialEmail((String) row.get("ecom_panel_credential_email"));
+	            form.setEcomPanelCredentialUsername((String) row.get("ecom_panel_credential_username"));
+	            // do not prefill secret
+	            form.setEcomPanelTwoFactorEnabled(toBoolean(row.get("ecom_panel_two_factor_enabled")));
+	            form.setEcomPanelNotes((String) row.get("ecom_panel_notes"));
+	        });
         form.setPaymentMethods(repo.findPaymentMethods(projectId));
         form.setCarriers(repo.findCarriers(projectId));
         form.setProductCategories(String.join(", ", repo.findCategories(projectId)));

@@ -382,17 +382,52 @@ public class IntakeRepository {
     public void upsertDomainSetup(UUID projectId, Map<String, Object> data) {
         String sql = """
             insert into dominio.domain_setup
-                (project_id, has_existing_domain, existing_domain, domain_to_register,
+                (project_id, has_existing_domain, existing_domain,
+                 existing_registrar, existing_dns_provider, existing_has_credentials,
+                 existing_credential_username, existing_credential_email, existing_credential_secret,
+                 existing_two_factor_enabled, existing_nameservers, existing_expiry_date, existing_transfer_locked,
+                 domain_to_register, alternative_domain_to_register,
+                 new_registrar, new_credential_username, new_credential_email, new_credential_secret,
+                 willing_to_register_new_domain, domain_issues, domain_problem_severity,
+                 reachability_checked_at, reachability_status, reachability_details,
                  domain_purchase_started_at, domain_purchase_completed_at,
                  preferred_mailbox, mailbox_mode)
             values
-                (:project_id, :has_existing_domain, :existing_domain, :domain_to_register,
+                (:project_id, :has_existing_domain, :existing_domain,
+                 :existing_registrar, :existing_dns_provider, :existing_has_credentials,
+                 :existing_credential_username, :existing_credential_email, :existing_credential_secret,
+                 :existing_two_factor_enabled, :existing_nameservers, :existing_expiry_date, :existing_transfer_locked,
+                 :domain_to_register, :alternative_domain_to_register,
+                 :new_registrar, :new_credential_username, :new_credential_email, :new_credential_secret,
+                 :willing_to_register_new_domain, :domain_issues, :domain_problem_severity,
+                 :reachability_checked_at, :reachability_status, :reachability_details,
                  :domain_purchase_started_at, :domain_purchase_completed_at,
                  :preferred_mailbox, :mailbox_mode)
             on conflict (project_id) do update set
                 has_existing_domain = excluded.has_existing_domain,
                 existing_domain = excluded.existing_domain,
+                existing_registrar = excluded.existing_registrar,
+                existing_dns_provider = excluded.existing_dns_provider,
+                existing_has_credentials = excluded.existing_has_credentials,
+                existing_credential_username = excluded.existing_credential_username,
+                existing_credential_email = excluded.existing_credential_email,
+                existing_credential_secret = coalesce(excluded.existing_credential_secret, dominio.domain_setup.existing_credential_secret),
+                existing_two_factor_enabled = excluded.existing_two_factor_enabled,
+                existing_nameservers = excluded.existing_nameservers,
+                existing_expiry_date = excluded.existing_expiry_date,
+                existing_transfer_locked = excluded.existing_transfer_locked,
                 domain_to_register = excluded.domain_to_register,
+                alternative_domain_to_register = excluded.alternative_domain_to_register,
+                new_registrar = excluded.new_registrar,
+                new_credential_username = excluded.new_credential_username,
+                new_credential_email = excluded.new_credential_email,
+                new_credential_secret = coalesce(excluded.new_credential_secret, dominio.domain_setup.new_credential_secret),
+                willing_to_register_new_domain = excluded.willing_to_register_new_domain,
+                domain_issues = excluded.domain_issues,
+                domain_problem_severity = excluded.domain_problem_severity,
+                reachability_checked_at = excluded.reachability_checked_at,
+                reachability_status = excluded.reachability_status,
+                reachability_details = excluded.reachability_details,
                 domain_purchase_started_at = excluded.domain_purchase_started_at,
                 domain_purchase_completed_at = excluded.domain_purchase_completed_at,
                 preferred_mailbox = excluded.preferred_mailbox,
@@ -507,27 +542,51 @@ public class IntakeRepository {
         jdbc.update(sql, new MapSqlParameterSource(data).addValue("project_id", projectId));
     }
 
-    public void upsertStoreSetup(UUID projectId, Map<String, Object> data) {
-        String sql = """
-            insert into ecommerce.store_setup
-                (project_id, purchase_enabled, auto_renewal_enabled, rid_enabled,
-                 csv_import_enabled, csv_import_instructions_sent_at,
-                 product_count, has_product_variants)
-            values
-                (:project_id, :purchase_enabled, :auto_renewal_enabled, :rid_enabled,
-                 :csv_import_enabled, :csv_import_instructions_sent_at,
-                 :product_count, :has_product_variants)
-            on conflict (project_id) do update set
-                purchase_enabled = excluded.purchase_enabled,
-                auto_renewal_enabled = excluded.auto_renewal_enabled,
-                rid_enabled = excluded.rid_enabled,
-                csv_import_enabled = excluded.csv_import_enabled,
-                csv_import_instructions_sent_at = excluded.csv_import_instructions_sent_at,
-                product_count = excluded.product_count,
-                has_product_variants = excluded.has_product_variants
-            """;
-        jdbc.update(sql, new MapSqlParameterSource(data).addValue("project_id", projectId));
-    }
+	    public void upsertStoreSetup(UUID projectId, Map<String, Object> data) {
+	        String sql = """
+	            insert into ecommerce.store_setup
+	                (project_id, purchase_enabled, auto_renewal_enabled, rid_enabled,
+	                 csv_import_enabled, csv_import_instructions_sent_at,
+	                 product_count, has_product_variants,
+	                 variant_management_mode, variant_axes, variant_total_sku_count, variant_separate_product_count,
+	                 variants_affect_price, variants_affect_stock,
+	                 ecom_panel_platform, ecom_panel_url, ecom_panel_has_credentials,
+	                 ecom_panel_credential_email, ecom_panel_credential_username, ecom_panel_credential_secret,
+	                 ecom_panel_two_factor_enabled, ecom_panel_notes)
+	            values
+	                (:project_id, :purchase_enabled, :auto_renewal_enabled, :rid_enabled,
+	                 :csv_import_enabled, :csv_import_instructions_sent_at,
+	                 :product_count, :has_product_variants,
+	                 :variant_management_mode, :variant_axes, :variant_total_sku_count, :variant_separate_product_count,
+	                 :variants_affect_price, :variants_affect_stock,
+	                 :ecom_panel_platform, :ecom_panel_url, :ecom_panel_has_credentials,
+	                 :ecom_panel_credential_email, :ecom_panel_credential_username, :ecom_panel_credential_secret,
+	                 :ecom_panel_two_factor_enabled, :ecom_panel_notes)
+	            on conflict (project_id) do update set
+	                purchase_enabled = excluded.purchase_enabled,
+	                auto_renewal_enabled = excluded.auto_renewal_enabled,
+	                rid_enabled = excluded.rid_enabled,
+	                csv_import_enabled = excluded.csv_import_enabled,
+	                csv_import_instructions_sent_at = excluded.csv_import_instructions_sent_at,
+	                product_count = excluded.product_count,
+	                has_product_variants = excluded.has_product_variants,
+	                variant_management_mode = excluded.variant_management_mode,
+	                variant_axes = excluded.variant_axes,
+	                variant_total_sku_count = excluded.variant_total_sku_count,
+	                variant_separate_product_count = excluded.variant_separate_product_count,
+	                variants_affect_price = excluded.variants_affect_price,
+	                variants_affect_stock = excluded.variants_affect_stock,
+	                ecom_panel_platform = excluded.ecom_panel_platform,
+	                ecom_panel_url = excluded.ecom_panel_url,
+	                ecom_panel_has_credentials = excluded.ecom_panel_has_credentials,
+	                ecom_panel_credential_email = excluded.ecom_panel_credential_email,
+	                ecom_panel_credential_username = excluded.ecom_panel_credential_username,
+	                ecom_panel_credential_secret = coalesce(excluded.ecom_panel_credential_secret, ecommerce.store_setup.ecom_panel_credential_secret),
+	                ecom_panel_two_factor_enabled = excluded.ecom_panel_two_factor_enabled,
+	                ecom_panel_notes = excluded.ecom_panel_notes
+	            """;
+	        jdbc.update(sql, new MapSqlParameterSource(data).addValue("project_id", projectId));
+	    }
 
     public void replacePaymentMethods(UUID projectId, List<String> methods) {
         jdbc.update("delete from ecommerce.accepted_payment_method where project_id = :pid",

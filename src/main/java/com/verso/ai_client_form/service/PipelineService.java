@@ -85,6 +85,21 @@ public class PipelineService {
     }
 
     @Transactional
+    public void renamePipeline(UUID pipelineId, String newName) {
+        if (pipelineId == null) {
+            throw new IllegalArgumentException("Pipeline non valida.");
+        }
+        String safe = newName == null ? "" : newName.trim();
+        if (safe.isBlank()) {
+            throw new IllegalArgumentException("Inserisci un nome pipeline.");
+        }
+        int updated = repo.renameImport(pipelineId, safe);
+        if (updated <= 0) {
+            throw new IllegalArgumentException("Pipeline non trovata.");
+        }
+    }
+
+    @Transactional
     public UUID importCsv(String pipelineName, MultipartFile file, String username) {
         String safeName = pipelineName == null ? "" : pipelineName.trim();
         if (safeName.isBlank()) {
