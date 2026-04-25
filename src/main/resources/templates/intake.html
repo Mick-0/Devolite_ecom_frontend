@@ -79,27 +79,27 @@
           <div class="grid">
             <div class="field" th:classappend="${#fields.hasErrors('legalName')} ? 'has-error'">
               <label>Ragione sociale</label>
-              <input type="text" th:field="*{legalName}" placeholder="Acme Srl" required data-required-message="Inserisci la ragione sociale." />
+              <input type="text" th:field="*{legalName}" placeholder="Acme Srl" required data-required-message="Inserisci la ragione sociale." data-progress-track />
               <p class="error" th:if="${#fields.hasErrors('legalName')}" th:errors="*{legalName}">Obbligatorio</p>
             </div>
             <div class="field">
               <label>Settore</label>
-              <input type="text" th:field="*{industry}" placeholder="Commercio al dettaglio" />
+              <input type="text" th:field="*{industry}" placeholder="Commercio al dettaglio" data-progress-track />
             </div>
             <div class="field">
               <label>Partita IVA</label>
-              <input type="text" th:field="*{vatNumber}" placeholder="IT12345678901" pattern="IT.*" title="La partita IVA deve iniziare con IT" />
+              <input type="text" th:field="*{vatNumber}" placeholder="IT12345678901" pattern="IT.*" title="La partita IVA deve iniziare con IT" data-progress-track />
             </div>
           </div>
           <div class="grid">
             <div class="field"><label>Indirizzo</label><input type="text" th:field="*{street}" placeholder="Via Roma 1" /></div>
-            <div class="field"><label>Città</label><input type="text" th:field="*{city}" placeholder="Milano" /></div>
+            <div class="field"><label>Città</label><input type="text" th:field="*{city}" placeholder="Milano" data-progress-track /></div>
             <div class="field"><label>Provincia</label><input type="text" th:field="*{province}" placeholder="MI" /></div>
           </div>
           <div class="grid">
             <div class="field"><label>CAP</label><input type="text" th:field="*{postalCode}" placeholder="20121" /></div>
             <div class="field"><label>Codice paese</label><input type="text" th:field="*{countryCode}" placeholder="IT" minlength="2" maxlength="2" pattern="[A-Za-z]{2}" title="Inserisci 2 lettere (es. IT)" /></div>
-            <div class="field"><label>Categoria</label><input type="text" th:field="*{category}" placeholder="Abbigliamento" /></div>
+            <div class="field"><label>Categoria</label><input type="text" th:field="*{category}" placeholder="Abbigliamento" data-progress-track /></div>
           </div>
           <div class="grid">
             <div class="field"><label>Anno di fondazione</label><input type="number" th:field="*{founderYears}" placeholder="2012" min="0" /></div>
@@ -114,14 +114,14 @@
         <section id="contact" class="card">
           <h3>Referente principale</h3>
           <div class="grid">
-            <div class="field"><label>Nome completo</label><input type="text" th:field="*{contactFullName}" placeholder="Mario Rossi" required data-required-message="Inserisci il nome completo del referente." /></div>
-            <div class="field"><label>Telefono</label><input type="tel" th:field="*{contactPhone}" placeholder="+39 02 1234567" pattern="\+39.*" title="Il numero deve iniziare con +39" /></div>
+            <div class="field"><label>Nome completo</label><input type="text" th:field="*{contactFullName}" placeholder="Mario Rossi" required data-required-message="Inserisci il nome completo del referente." data-progress-track /></div>
+            <div class="field"><label>Telefono</label><input type="tel" th:field="*{contactPhone}" placeholder="+39 02 1234567" pattern="\+39.*" title="Il numero deve iniziare con +39" data-progress-track /></div>
             <div class="field"><label>Telefono secondario</label><input type="tel" th:field="*{contactPhoneSecondary}" placeholder="+39 333 1234567" pattern="\+39.*" title="Il numero deve iniziare con +39" /></div>
           </div>
           <div class="grid">
-            <div class="field"><label>Email</label><input type="email" th:field="*{contactEmail}" placeholder="mario.rossi@acme.it" /></div>
+            <div class="field"><label>Email</label><input type="email" th:field="*{contactEmail}" placeholder="mario.rossi@acme.it" data-progress-track /></div>
             <div class="field"><label>Email secondaria</label><input type="email" th:field="*{contactEmailSecondary}" placeholder="info@acme.it" /></div>
-            <div class="field"><label>Ruolo</label><input type="text" th:field="*{contactRoleTitle}" placeholder="CEO" /></div>
+            <div class="field"><label>Ruolo</label><input type="text" th:field="*{contactRoleTitle}" placeholder="CEO" data-progress-track /></div>
           </div>
           <div class="grid-1">
             <div class="field"><label>Note</label><textarea th:field="*{contactNotes}" placeholder="Disponibile al mattino."></textarea></div>
@@ -133,12 +133,12 @@
           <div class="grid">
             <div class="field" th:classappend="${#fields.hasErrors('projectName')} ? 'has-error'">
               <label>Nome progetto</label>
-              <input type="text" th:field="*{projectName}" placeholder="Nuovo e-commerce Acme" required data-required-message="Inserisci il nome del progetto." />
+              <input type="text" th:field="*{projectName}" placeholder="Nuovo e-commerce Acme" required data-required-message="Inserisci il nome del progetto." data-progress-track />
               <p class="error" th:if="${#fields.hasErrors('projectName')}" th:errors="*{projectName}">Obbligatorio</p>
             </div>
             <div class="field">
               <label>Tipo progetto</label>
-              <select th:field="*{projectKind}" required data-required-message="Seleziona il tipo di progetto.">
+              <select th:field="*{projectKind}" required data-required-message="Seleziona il tipo di progetto." data-progress-track>
                 <option value="">Seleziona...</option>
                 <option value="vetrina">Vetrina</option>
                 <option value="ecommerce">E-commerce</option>
@@ -158,7 +158,7 @@
             </div>
           </div>
           <div class="grid">
-            <div class="field"><label>Risultato atteso</label><input type="text" th:field="*{expectedOutcome}" placeholder="Aumentare vendite online" /></div>
+            <div class="field"><label>Risultato atteso</label><input type="text" th:field="*{expectedOutcome}" placeholder="Aumentare vendite online" data-progress-track /></div>
           </div>
         </section>
 
@@ -225,7 +225,7 @@
           <div class="grid">
             <div class="field">
               <label>Modalità supporto</label>
-              <select th:field="*{legalSupportMode}">
+              <select th:field="*{legalSupportMode}" data-progress-track>
                 <option value="">Seleziona...</option>
                 <option value="consulente_cliente">Consulente del cliente</option>
                 <option value="integrazione_iubenda">Integrazione Iubenda</option>
@@ -251,14 +251,14 @@
             <div class="field color-field">
               <label>Colore primario</label>
               <div class="color-inputs">
-                <input type="text" th:field="*{primaryColor}" placeholder="#0f766e" pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" title="Inserisci un colore esadecimale (#RGB o #RRGGBB)" data-color-hex="primaryColor" />
+                <input type="text" th:field="*{primaryColor}" placeholder="#0f766e" pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" title="Inserisci un colore esadecimale (#RGB o #RRGGBB)" data-color-hex="primaryColor" data-progress-track />
                 <input type="color" class="color-picker" value="#443877" data-color-target="primaryColor" data-skip-progress />
               </div>
             </div>
             <div class="field color-field">
               <label>Colore secondario</label>
               <div class="color-inputs">
-                <input type="text" th:field="*{secondaryColor}" placeholder="#c05621" pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" title="Inserisci un colore esadecimale (#RGB o #RRGGBB)" data-color-hex="secondaryColor" />
+                <input type="text" th:field="*{secondaryColor}" placeholder="#c05621" pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" title="Inserisci un colore esadecimale (#RGB o #RRGGBB)" data-color-hex="secondaryColor" data-progress-track />
                 <input type="color" class="color-picker" value="#7d6eb0" data-color-target="secondaryColor" data-skip-progress />
               </div>
             </div>
@@ -280,7 +280,7 @@
             </div>
             <div class="field">
               <label>Policy font</label>
-              <select th:field="*{fontPolicy}">
+              <select th:field="*{fontPolicy}" data-progress-track>
                 <option value="">Seleziona...</option>
                 <option value="font_aziendali">Font aziendali</option>
                 <option value="da_selezionare">Da selezionare</option>
@@ -288,7 +288,7 @@
             </div>
             <div class="field">
               <label>Fonte asset visivi</label>
-              <select th:field="*{visualAssetSource}">
+              <select th:field="*{visualAssetSource}" data-progress-track>
                 <option value="">Seleziona...</option>
                 <option value="fornite_cliente">Fornite dal cliente</option>
                 <option value="stock">Stock</option>
@@ -299,7 +299,7 @@
           <div class="grid">
             <div class="field">
               <label>Tono di voce</label>
-              <select th:field="*{toneOfVoice}">
+              <select th:field="*{toneOfVoice}" data-progress-track>
                 <option value="">Seleziona...</option>
                 <option value="formale">Formale</option>
                 <option value="amichevole">Amichevole</option>
@@ -356,7 +356,7 @@
           <div class="grid">
             <div class="field">
               <label>Obiettivo del sito</label>
-              <select th:field="*{showcaseGoal}">
+              <select th:field="*{showcaseGoal}" data-progress-track>
                 <option value="">Seleziona...</option>
                 <option value="presentazione_azienda">Presentazione aziendale</option>
                 <option value="raccolta_contatti">Raccolta contatti</option>
@@ -369,7 +369,7 @@
             <div class="field"><label>Numero pagine</label><input type="number" th:field="*{showcasePageCount}" placeholder="6" min="0" /></div>
             <div class="field">
               <label>CTA principale</label>
-              <select th:field="*{showcasePrimaryCta}">
+              <select th:field="*{showcasePrimaryCta}" data-progress-track>
                 <option value="">Seleziona...</option>
                 <option value="contattaci">Contattaci</option>
                 <option value="richiedi_preventivo">Richiedi preventivo</option>
@@ -380,8 +380,8 @@
             </div>
           </div>
           <div class="grid-1">
-            <div class="field"><label>Pagine richieste</label><textarea th:field="*{showcaseRequestedPages}" placeholder="Home&#10;Chi siamo&#10;Servizi&#10;Portfolio&#10;Contatti"></textarea></div>
-            <div class="field"><label>Struttura homepage</label><textarea th:field="*{showcaseHomepageSections}" placeholder="Hero iniziale&#10;Servizi principali&#10;Numeri chiave&#10;Testimonianze&#10;CTA finale"></textarea></div>
+            <div class="field"><label>Pagine richieste</label><textarea th:field="*{showcaseRequestedPages}" placeholder="Home&#10;Chi siamo&#10;Servizi&#10;Portfolio&#10;Contatti" data-progress-track></textarea></div>
+            <div class="field"><label>Struttura homepage</label><textarea th:field="*{showcaseHomepageSections}" placeholder="Hero iniziale&#10;Servizi principali&#10;Numeri chiave&#10;Testimonianze&#10;CTA finale" data-progress-track></textarea></div>
           </div>
           <div class="grid">
             <label class="check-row"><input type="checkbox" th:field="*{showcaseNeedsAboutPage}" /> Pagina chi siamo</label>
@@ -411,15 +411,15 @@
         <section id="site" class="card" data-applicable="ecommerce">
           <h3>Brief e-commerce</h3>
           <div class="grid-1">
-            <div class="field"><label>Siti di ispirazione</label><textarea th:field="*{inspirationSites}" placeholder="https://example.com&#10;https://brand.com"></textarea></div>
-            <div class="field"><label>Menu shop richiesto</label><textarea th:field="*{requestedMenu}" placeholder="Home&#10;Shop&#10;Chi siamo&#10;Contatti&#10;Carrello"></textarea></div>
+            <div class="field"><label>Siti di ispirazione</label><textarea th:field="*{inspirationSites}" placeholder="https://example.com&#10;https://brand.com" data-progress-track></textarea></div>
+            <div class="field"><label>Menu shop richiesto</label><textarea th:field="*{requestedMenu}" placeholder="Home&#10;Shop&#10;Chi siamo&#10;Contatti&#10;Carrello" data-progress-track></textarea></div>
           </div>
           <div class="grid">
             <label class="check-row"><input type="checkbox" th:field="*{hasExistingEcommerce}" /> Ha già un e-commerce</label>
             <div class="field"><label>Sito e-commerce esistente</label><input type="text" th:field="*{existingEcommerceUrl}" placeholder="https://shop.acme.it" /></div>
             <div class="field">
               <label>Modalità testi</label>
-              <select th:field="*{copyMode}">
+              <select th:field="*{copyMode}" data-progress-track>
                 <option value="">Seleziona...</option>
                 <option value="scrivi_cliente">Testi del cliente</option>
                 <option value="genera_ai">Testi generati con IA</option>
@@ -460,11 +460,11 @@
           <div class="grid" data-domain-existing-fields>
             <div class="field">
               <label>Dominio esistente</label>
-              <input type="text" th:field="*{existingDomain}" placeholder="acme.it" inputmode="url" />
+              <input type="text" th:field="*{existingDomain}" placeholder="acme.it" inputmode="url" data-progress-track />
             </div>
             <div class="field">
               <label>Provider / registrar</label>
-              <select th:field="*{existingDomainRegistrar}">
+              <select th:field="*{existingDomainRegistrar}" data-progress-track>
                 <option value="">Seleziona...</option>
                 <option value="Aruba">Aruba</option>
                 <option value="Register.it">Register.it</option>
@@ -499,7 +499,7 @@
           <div class="grid" data-domain-new-fields>
             <div class="field">
               <label>Dominio da acquistare</label>
-              <input type="text" th:field="*{domainToRegister}" placeholder="acme.it" inputmode="url" data-domain-to-buy />
+              <input type="text" th:field="*{domainToRegister}" placeholder="acme.it" inputmode="url" data-domain-to-buy data-progress-track />
             </div>
             <div class="field">
               <label>Verifica acquistabilità (API)</label>
@@ -602,7 +602,7 @@
 	            <div class="field"><label>Istruzioni CSV inviate il</label><input type="datetime-local" th:field="*{csvImportInstructionsSentAt}" /></div>
 	          </div>
 	          <div class="grid">
-	            <div class="field"><label>Numero prodotti da inserire</label><input type="number" th:field="*{productCount}" placeholder="120" min="0" /></div>
+	            <div class="field"><label>Numero prodotti da inserire</label><input type="number" th:field="*{productCount}" placeholder="120" min="0" data-progress-track /></div>
 	            <label class="check-row"><input type="checkbox" th:field="*{productHasVariants}" data-has-variants /> Ha varianti di prodotto</label>
 	          </div>
 	          <div class="grid" data-variant-fields style="margin-top:4px;">
@@ -626,7 +626,7 @@
 	          <div class="grid-1" data-variant-fields>
 	            <div class="field">
 	              <label>Tipi di varianti (taglie, colori, ecc.)</label>
-	              <textarea th:field="*{variantAxes}" placeholder="Taglia, Colore, Materiale"></textarea>
+	              <textarea th:field="*{variantAxes}" placeholder="Taglia, Colore, Materiale" data-progress-track></textarea>
 	            </div>
 	          </div>
 	          <div class="grid" data-variant-fields>
@@ -638,7 +638,7 @@
 	          <div class="grid">
 	            <div class="field">
 	              <label>Piattaforma</label>
-	              <select th:field="*{ecomPanelPlatform}">
+	              <select th:field="*{ecomPanelPlatform}" data-progress-track>
 	                <option value="">Seleziona...</option>
 	                <option value="Shopify">Shopify</option>
 	                <option value="WooCommerce">WooCommerce</option>

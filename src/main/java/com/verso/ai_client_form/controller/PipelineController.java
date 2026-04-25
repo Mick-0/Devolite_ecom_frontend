@@ -1,6 +1,7 @@
 package com.verso.ai_client_form.controller;
 
 import java.security.Principal;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -92,6 +93,36 @@ public class PipelineController {
                                              @RequestParam(value = "sortDir", required = false) String sortDir) {
         int capped = (limit == null) ? 300 : Math.min(Math.max(limit, 1), 500);
         return repo.listRows(pipelineId, capped, query, sortBy, sortDir);
+    }
+
+    @GetMapping(path = "/pipelines/{pipelineId}/rows/table", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Map<String, Object> listRowsTable(@PathVariable("pipelineId") UUID pipelineId,
+                                             @RequestParam(value = "limit", required = false) Integer limit,
+                                             @RequestParam(value = "q", required = false) String query,
+                                             @RequestParam(value = "sortBy", required = false) String sortBy,
+                                             @RequestParam(value = "sortDir", required = false) String sortDir) {
+        int capped = (limit == null) ? 300 : Math.min(Math.max(limit, 1), 500);
+        return pipelineService.listTableRows(pipelineId, capped, query, sortBy, sortDir);
+    }
+
+    @PostMapping(path = "/pipelines/rows/{rowId}/table", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> updateRowTable(@PathVariable("rowId") UUID rowId,
+                                                              @RequestBody Map<String, Object> body) {
+        Object rawValues = body == null ? null : body.get("values");
+        Map<String, Object> values = new LinkedHashMap<>();
+        if (rawValues instanceof Map<?, ?> map) {
+            map.forEach((key, value) -> values.put(String.valueOf(key), value));
+        }
+        try {
+            pipelineService.updateTableRow(rowId, values);
+            return ResponseEntity.ok(Map.of("ok", true));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("ok", false, "error", ex.getMessage()));
+        } catch (Exception ex) {
+            return ResponseEntity.internalServerError().body(Map.of("ok", false, "error", "Errore durante il salvataggio riga."));
+        }
     }
 
     @PostMapping(path = "/pipelines/rows/{rowId}/delete", produces = MediaType.APPLICATION_JSON_VALUE)

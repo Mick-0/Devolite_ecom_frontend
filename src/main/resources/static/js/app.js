@@ -208,6 +208,10 @@
   const initPipelinePage = () => {
     const pipelineId = document.body?.dataset?.pipelineId;
     const listEl = document.querySelector('[data-pipeline-row-list]');
+    const tableWrapEl = document.querySelector('[data-pipeline-table-wrap]');
+    const tableHeadEl = document.querySelector('[data-pipeline-table-head]');
+    const tableBodyEl = document.querySelector('[data-pipeline-table-body]');
+    const viewButtons = Array.from(document.querySelectorAll('[data-pipeline-view-btn]'));
     if (!pipelineId || !listEl) return;
 
     const renameInput = document.querySelector('[data-pipeline-rename-name]');
@@ -256,8 +260,30 @@
     const sortByEl = document.querySelector('[data-pipeline-row-sort-by]');
     const sortDirEl = document.querySelector('[data-pipeline-row-sort-dir]');
     const statusEl = document.querySelector('[data-pipeline-row-status]');
+    const columnLabels = {
+      project_name: 'Nome progetto',
+      company_legal_name: 'Azienda',
+      vat_number: 'Partita IVA',
+      contact_full_name: 'Contatto',
+      contact_email: 'Email',
+      contact_phone: 'Telefono',
+      crm_temperature: 'Temperatura',
+      crm_notes: 'Note CRM',
+      crm_sector: 'Settore CRM',
+      crm_current_stage: 'Fase CRM',
+      crm_cta: 'CTA CRM'
+    };
+    const temperatureOptions = ['', 'freddo', 'tiepido', 'caldo', 'bollente', 'disqualificato'];
+    const stageOptions = ['', 'lead', 'prospect', 'cliente'];
+    let currentView = 'cards';
 
     let fetchTimer = null;
+
+    const setStatus = (msg, isError = true) => {
+      if (!statusEl) return;
+      statusEl.textContent = msg || '';
+      statusEl.style.color = msg ? (isError ? '#b54848' : 'var(--muted)') : '#b54848';
+    };
 
     const buildQuery = () => {
       const params = new URLSearchParams();
@@ -292,9 +318,9 @@
           headers: { [csrf.headerName]: csrf.token, 'Accept': 'application/json' }
         });
         await resp.json().catch(() => ({}));
-        fetchRows();
+        fetchActiveView();
       } catch (err) {
-        if (statusEl) statusEl.textContent = 'Errore nella cancellazione della riga.';
+        setStatus('Errore nella cancellazione della riga.');
       }
     };
 
@@ -373,7 +399,7 @@
 
     const fetchRows = async () => {
       listEl.innerHTML = '<div class="modal-empty">Caricamento...</div>';
-      if (statusEl) statusEl.textContent = '';
+      setStatus('', false);
       try {
         const resp = await fetch(`/pipelines/${encodeURIComponent(pipelineId)}/rows?${buildQuery()}`, { headers: { 'Accept': 'application/json' } });
         if (!resp.ok) throw new Error('load failed');
@@ -384,16 +410,260 @@
       }
     };
 
+    const isDirtyInput = (input) => String(input.value || '') !== String(input.dataset.originalValue || '');
+
+    const refreshInputState = (input) => {
+      input.classList.toggle('is-dirty', isDirtyInput(input));
+      if (!isDirtyInput(input)) {
+        input.classList.remove('is-error');
+      }
+    };
+
+    const buildCellInput = (column, value) => {
+      const safeValue = value == null ? '' : String(value);
+      let input;
+      if (column === 'crm_notes') {
+        input = document.createElement('textarea');
+        input.rows = 3;
+      } else if (column === 'crm_temperature' || column === 'crm_current_stage') {
+        input = document.createElement('select');
+        const options = column === 'crm_temperature' ? temperatureOptions : stageOptions;
+        options.forEach((optionValue) => {
+          const option = document.createElement('option');
+          option.value = optionValue;
+          option.textContent = optionValue || '-';
+          input.appendChild(option);
+        });
+      } else {
+        input = document.createElement('input');
+        input.type = column === 'contact_email' ? 'email' : (column === 'contact_phone' ? 'tel' : 'text');
+      }
+      input.className = 'pipeline-table__cell-input';
+      input.dataset.column = column;
+      input.dataset.originalValue = safeValue;
+      input.value = safeValue;
+      const refresh = () => refreshInputState(input);
+      input.addEventListener('input', refresh);
+      input.addEventListener('change', refresh);
+      refresh();
+      return input;
+    };
+
+    const collectRowValues = (rowEl) => {
+      const values = {};
+      rowEl.querySelectorAll('[data-column]').forEach((input) => {
+        values[input.dataset.column] = String(input.value || '').trim();
+      });
+      return values;
+    };
+
+    const setRowSaving = (rowEl, saving) => {
+      rowEl.querySelectorAll('[data-column]').forEach((input) => {
+        input.disabled = saving;
+        input.classList.toggle('is-saving', saving);
+      });
+      rowEl.querySelectorAll('[data-row-action]').forEach((button) => {
+        button.disabled = saving;
+      });
+    };
+
+    const markRowSynced = (rowEl) => {
+      rowEl.querySelectorAll('[data-column]').forEach((input) => {
+        input.dataset.originalValue = String(input.value || '');
+        input.classList.remove('is-saving');
+        input.classList.remove('is-error');
+        refreshInputState(input);
+      });
+    };
+
+    const markRowError = (rowEl) => {
+      rowEl.querySelectorAll('[data-column]').forEach((input) => {
+        if (isDirtyInput(input)) {
+          input.classList.add('is-error');
+        }
+        input.classList.remove('is-saving');
+      });
+    };
+
+    const saveTableRow = async (item, rowEl) => {
+      const csrf = readCsrf();
+      const noteEl = rowEl.querySelector('[data-row-note]');
+      if (!csrf) {
+        if (noteEl) noteEl.textContent = 'CSRF mancante. Ricarica la pagina.';
+        markRowError(rowEl);
+        return;
+      }
+      const values = collectRowValues(rowEl);
+      setRowSaving(rowEl, true);
+      if (noteEl) noteEl.textContent = 'Salvataggio...';
+      try {
+        const resp = await fetch(`/pipelines/rows/${encodeURIComponent(item.rowId)}/table`, {
+          method: 'POST',
+          headers: {
+            [csrf.headerName]: csrf.token,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ values })
+        });
+        const payload = await resp.json().catch(() => ({}));
+        if (!resp.ok || payload.ok === false) {
+          throw new Error(payload.error || 'Errore durante il salvataggio della riga.');
+        }
+        markRowSynced(rowEl);
+        if (noteEl) noteEl.textContent = 'Riga salvata.';
+        setStatus('Riga aggiornata.', false);
+      } catch (err) {
+        markRowError(rowEl);
+        if (noteEl) noteEl.textContent = err?.message || 'Errore durante il salvataggio della riga.';
+        setStatus(err?.message || 'Errore durante il salvataggio della riga.');
+      } finally {
+        setRowSaving(rowEl, false);
+      }
+    };
+
+    const renderTable = (payload) => {
+      if (!tableHeadEl || !tableBodyEl) return;
+      const columns = Array.isArray(payload?.columns) ? payload.columns : [];
+      const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+
+      const headRow = document.createElement('tr');
+      ['Riga', 'Stato', 'Aggiornato', ...columns.map((column) => columnLabels[column] || column), 'Azioni'].forEach((label) => {
+        const th = document.createElement('th');
+        th.textContent = label;
+        headRow.appendChild(th);
+      });
+      tableHeadEl.innerHTML = '';
+      tableHeadEl.appendChild(headRow);
+
+      tableBodyEl.innerHTML = '';
+      if (!rows.length) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.className = 'modal-empty';
+        td.colSpan = columns.length + 4;
+        td.textContent = 'Nessuna riga trovata.';
+        tr.appendChild(td);
+        tableBodyEl.appendChild(tr);
+        return;
+      }
+
+      rows.forEach((item) => {
+        const tr = document.createElement('tr');
+
+        const rowNumberTd = document.createElement('td');
+        rowNumberTd.className = 'pipeline-table__meta';
+        rowNumberTd.innerHTML = `<strong>#${item.rowNumber || '-'}</strong>`;
+        tr.appendChild(rowNumberTd);
+
+        const statusTd = document.createElement('td');
+        statusTd.className = 'pipeline-table__meta';
+        const badge = document.createElement('span');
+        badge.className = 'modal-tag';
+        badge.textContent = item.done ? 'Fatto' : 'Da fare';
+        statusTd.appendChild(badge);
+        tr.appendChild(statusTd);
+
+        const updatedTd = document.createElement('td');
+        updatedTd.className = 'pipeline-table__meta';
+        updatedTd.textContent = formatDate(item.updatedAt) || '-';
+        tr.appendChild(updatedTd);
+
+        columns.forEach((column) => {
+          const td = document.createElement('td');
+          const input = buildCellInput(column, item.cells?.[column] || '');
+          td.appendChild(input);
+          tr.appendChild(td);
+        });
+
+        const actionsTd = document.createElement('td');
+        actionsTd.className = 'pipeline-table__actions';
+        const actionsWrap = document.createElement('div');
+        actionsWrap.className = 'pipeline-table__actions-wrap';
+
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.className = 'primary';
+        saveBtn.textContent = 'Salva';
+        saveBtn.dataset.rowAction = 'save';
+        saveBtn.addEventListener('click', () => saveTableRow(item, tr));
+
+        const openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.className = 'secondary';
+        openBtn.textContent = 'Apri form';
+        openBtn.dataset.rowAction = 'open';
+        openBtn.addEventListener('click', () => openRow(item));
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'secondary';
+        deleteBtn.textContent = 'Cancella';
+        deleteBtn.dataset.rowAction = 'delete';
+        deleteBtn.addEventListener('click', () => deleteRow(item.rowId));
+
+        actionsWrap.append(saveBtn, openBtn, deleteBtn);
+
+        const note = document.createElement('div');
+        note.className = 'pipeline-table__row-note';
+        note.dataset.rowNote = 'true';
+        note.textContent = item.doneProjectId ? 'Già collegata a un progetto salvato.' : '';
+
+        actionsTd.append(actionsWrap, note);
+        tr.appendChild(actionsTd);
+        tableBodyEl.appendChild(tr);
+      });
+    };
+
+    const fetchTableRows = async () => {
+      if (!tableBodyEl) return;
+      tableBodyEl.innerHTML = '<tr><td class="modal-empty" colspan="20">Caricamento...</td></tr>';
+      setStatus('', false);
+      try {
+        const resp = await fetch(`/pipelines/${encodeURIComponent(pipelineId)}/rows/table?${buildQuery()}`, { headers: { 'Accept': 'application/json' } });
+        if (!resp.ok) throw new Error('load failed');
+        const payload = await resp.json();
+        renderTable(payload);
+      } catch (err) {
+        tableBodyEl.innerHTML = '<tr><td class="modal-empty" colspan="20">Errore nel caricamento tabellare.</td></tr>';
+      }
+    };
+
+    const fetchActiveView = () => {
+      if (currentView === 'table') {
+        fetchTableRows();
+        return;
+      }
+      fetchRows();
+    };
+
+    const setView = (view) => {
+      currentView = view === 'table' ? 'table' : 'cards';
+      listEl.hidden = currentView !== 'cards';
+      listEl.style.display = currentView === 'cards' ? '' : 'none';
+      if (tableWrapEl) {
+        tableWrapEl.hidden = currentView !== 'table';
+        tableWrapEl.style.display = currentView === 'table' ? '' : 'none';
+      }
+      viewButtons.forEach((button) => {
+        button.classList.toggle('is-active', button.dataset.view === currentView);
+      });
+      fetchActiveView();
+    };
+
     const scheduleFetch = () => {
       if (fetchTimer) window.clearTimeout(fetchTimer);
-      fetchTimer = window.setTimeout(fetchRows, 220);
+      fetchTimer = window.setTimeout(fetchActiveView, 220);
     };
 
     searchEl?.addEventListener('input', scheduleFetch);
-    sortByEl?.addEventListener('change', fetchRows);
-    sortDirEl?.addEventListener('change', fetchRows);
+    sortByEl?.addEventListener('change', fetchActiveView);
+    sortDirEl?.addEventListener('change', fetchActiveView);
+    viewButtons.forEach((button) => {
+      button.addEventListener('click', () => setView(button.dataset.view));
+    });
 
-    fetchRows();
+    setView(currentView);
   };
 
   initPipelinesModal();
@@ -677,6 +947,16 @@
     return el.value && el.value.trim().length > 0;
   };
 
+  const autoTrackedSectionIds = new Set(['company', 'legal', 'project', 'domain']);
+
+  const isVisibleForProgress = (field) => {
+    if (!field) return false;
+    const section = field.closest('section.card[id]');
+    if (section && !isApplicableElement(section)) return false;
+    if (field.closest('[hidden]')) return false;
+    return field.getClientRects().length > 0;
+  };
+
   const getTrackedFields = () => {
     if (!form) return [];
     return Array.from(form.querySelectorAll('input, textarea, select'))
@@ -684,20 +964,18 @@
         if (field.disabled) return false;
         if (field.type === 'hidden') return false;
         if (field.hasAttribute('data-skip-progress')) return false;
+        if (field.type === 'checkbox' || field.type === 'radio') return false;
+        if (field.type === 'date' || field.type === 'datetime-local') return false;
         if (['submit', 'reset', 'button', 'image'].includes(field.type)) return false;
-        return true;
+        if (!isVisibleForProgress(field)) return false;
+        const section = field.closest('section.card[id]');
+        const autoTracked = !!(section && autoTrackedSectionIds.has(section.id));
+        return autoTracked || field.hasAttribute('data-progress-track');
       });
   };
 
   const getProgressEligibleFields = () => {
-    if (!form) return [];
-    return Array.from(form.querySelectorAll('input, textarea, select'))
-      .filter(field => {
-        if (field.type === 'hidden') return false;
-        if (field.hasAttribute('data-skip-progress')) return false;
-        if (['submit', 'reset', 'button', 'image'].includes(field.type)) return false;
-        return true;
-      });
+    return getTrackedFields();
   };
 
   const isCompleted = (field) => {

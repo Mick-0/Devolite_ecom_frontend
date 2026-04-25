@@ -47,6 +47,10 @@
       </div>
 
       <div class="card">
+        <div class="pipeline-view-switch" style="margin-bottom:12px;">
+          <button type="button" class="secondary is-active" data-pipeline-view-btn data-view="cards">Vista schede</button>
+          <button type="button" class="secondary" data-pipeline-view-btn data-view="table">Vista tabella</button>
+        </div>
         <div class="modal-search" style="margin-bottom:12px;">
           <input type="text" data-pipeline-row-search placeholder="Cerca per progetto, azienda, contatto, email, telefono" />
           <div style="display:flex; gap:10px; align-items:end;">
@@ -78,6 +82,18 @@
         <div class="modal-status" data-pipeline-row-status></div>
         <div class="modal-list" data-pipeline-row-list style="max-height: calc(100vh - 360px);">
           <div class="modal-empty">Caricamento...</div>
+        </div>
+        <div class="pipeline-table-wrap" data-pipeline-table-wrap hidden>
+          <div class="pipeline-table-scroller">
+            <table class="pipeline-table" data-pipeline-table>
+              <thead data-pipeline-table-head></thead>
+              <tbody data-pipeline-table-body>
+                <tr>
+                  <td class="modal-empty" colspan="20">Caricamento...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </main>

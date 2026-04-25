@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -76,6 +77,20 @@ public class PipelineService {
         "freddo", "tiepido", "caldo", "bollente", "disqualificato"
     );
 
+    private static final List<String> TABLE_HEADERS = List.of(
+        H_PROJECT_NAME,
+        H_COMPANY_LEGAL_NAME,
+        H_VAT_NUMBER,
+        H_CONTACT_FULL_NAME,
+        H_CONTACT_EMAIL,
+        H_CONTACT_PHONE,
+        H_CRM_TEMPERATURE,
+        H_CRM_NOTES,
+        H_CRM_SECTOR,
+        H_CRM_STAGE,
+        H_CRM_CTA
+    );
+
     private final PipelineRepository repo;
     private final ObjectMapper objectMapper;
 
@@ -96,6 +111,76 @@ public class PipelineService {
         int updated = repo.renameImport(pipelineId, safe);
         if (updated <= 0) {
             throw new IllegalArgumentException("Pipeline non trovata.");
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> listTableRows(UUID pipelineId, int limit, String query, String sortBy, String sortDir) {
+        List<Map<String, Object>> rawRows = repo.listRowsForTable(pipelineId, limit, query, sortBy, sortDir);
+        List<Map<String, Object>> rows = new ArrayList<>(rawRows.size());
+        for (Map<String, Object> rawRow : rawRows) {
+            rows.add(toTableRow(rawRow));
+        }
+        return Map.of(
+            "columns", TABLE_HEADERS,
+            "rows", rows
+        );
+    }
+
+    @Transactional
+    public void updateTableRow(UUID rowId, Map<String, Object> inputValues) {
+        if (rowId == null) {
+            throw new IllegalArgumentException("Riga pipeline non valida.");
+        }
+        Map<String, String> values = sanitizeTableValues(inputValues);
+        String projectName = trimToNull(values.get(H_PROJECT_NAME));
+        String companyName = trimToNull(values.get(H_COMPANY_LEGAL_NAME));
+        if (projectName == null) {
+            throw new IllegalArgumentException("project_name non puo essere vuoto.");
+        }
+        if (companyName == null) {
+            throw new IllegalArgumentException("company_legal_name non puo essere vuoto.");
+        }
+
+        String crmTemperature = normalizeTemperature(values.get(H_CRM_TEMPERATURE));
+        String crmStage = normalizeStage(values.get(H_CRM_STAGE));
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        putIfNotBlank(data, HEADER_TO_INTAKE_FIELD.get(H_PROJECT_NAME), projectName);
+        putIfNotBlank(data, HEADER_TO_INTAKE_FIELD.get(H_COMPANY_LEGAL_NAME), companyName);
+        putIfNotBlank(data, HEADER_TO_INTAKE_FIELD.get(H_VAT_NUMBER), values.get(H_VAT_NUMBER));
+        putIfNotBlank(data, HEADER_TO_INTAKE_FIELD.get(H_CONTACT_FULL_NAME), values.get(H_CONTACT_FULL_NAME));
+        putIfNotBlank(data, HEADER_TO_INTAKE_FIELD.get(H_CONTACT_EMAIL), values.get(H_CONTACT_EMAIL));
+        putIfNotBlank(data, HEADER_TO_INTAKE_FIELD.get(H_CONTACT_PHONE), values.get(H_CONTACT_PHONE));
+        putIfNotBlank(data, HEADER_TO_INTAKE_FIELD.get(H_CRM_NOTES), values.get(H_CRM_NOTES));
+        putIfNotBlank(data, HEADER_TO_INTAKE_FIELD.get(H_CRM_SECTOR), values.get(H_CRM_SECTOR));
+        putIfNotBlank(data, HEADER_TO_INTAKE_FIELD.get(H_CRM_CTA), values.get(H_CRM_CTA));
+        if (crmTemperature != null) {
+            data.put(HEADER_TO_INTAKE_FIELD.get(H_CRM_TEMPERATURE), crmTemperature);
+        }
+        if (crmStage != null) {
+            data.put(HEADER_TO_INTAKE_FIELD.get(H_CRM_STAGE), crmStage);
+        }
+
+        String dataJson;
+        try {
+            dataJson = objectMapper.writeValueAsString(data);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Errore nella preparazione dei dati riga.");
+        }
+
+        int updated = repo.updateRowTableData(
+            rowId,
+            projectName,
+            companyName,
+            trimToNull(values.get(H_CONTACT_FULL_NAME)),
+            trimToNull(values.get(H_CONTACT_EMAIL)),
+            trimToNull(values.get(H_CONTACT_PHONE)),
+            crmTemperature,
+            dataJson
+        );
+        if (updated <= 0) {
+            throw new IllegalArgumentException("Riga pipeline non trovata.");
         }
     }
 
@@ -360,6 +445,67 @@ public class PipelineService {
         }
         String trimmed = value.trim();
         return trimmed.isBlank() ? null : trimmed;
+    }
+
+    private static String trimToNull(String value) {
+        return emptyToNull(value);
+    }
+
+    private Map<String, Object> toTableRow(Map<String, Object> rawRow) {
+        Map<String, Object> data = parseRowData(rawRow.get("data_json"));
+        Map<String, String> cells = new LinkedHashMap<>();
+        for (String header : TABLE_HEADERS) {
+            cells.put(header, resolveCellValue(header, rawRow, data));
+        }
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("rowId", rawRow.get("row_id"));
+        row.put("rowNumber", rawRow.get("row_number"));
+        row.put("done", Boolean.TRUE.equals(rawRow.get("is_done")));
+        row.put("doneProjectId", rawRow.get("done_project_id"));
+        row.put("updatedAt", rawRow.get("updated_at"));
+        row.put("cells", cells);
+        return row;
+    }
+
+    private Map<String, Object> parseRowData(Object rawJson) {
+        if (rawJson == null) {
+            return Map.of();
+        }
+        String json = rawJson.toString();
+        if (json.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception ex) {
+            return Map.of();
+        }
+    }
+
+    private String resolveCellValue(String header, Map<String, Object> rawRow, Map<String, Object> data) {
+        return switch (header) {
+            case H_PROJECT_NAME -> stringify(rawRow.get("project_name"), data.get(HEADER_TO_INTAKE_FIELD.get(header)));
+            case H_COMPANY_LEGAL_NAME -> stringify(rawRow.get("company_name"), data.get(HEADER_TO_INTAKE_FIELD.get(header)));
+            case H_CONTACT_FULL_NAME -> stringify(rawRow.get("contact_full_name"), data.get(HEADER_TO_INTAKE_FIELD.get(header)));
+            case H_CONTACT_EMAIL -> stringify(rawRow.get("contact_email"), data.get(HEADER_TO_INTAKE_FIELD.get(header)));
+            case H_CONTACT_PHONE -> stringify(rawRow.get("contact_phone"), data.get(HEADER_TO_INTAKE_FIELD.get(header)));
+            case H_CRM_TEMPERATURE -> stringify(rawRow.get("crm_temperature"), data.get(HEADER_TO_INTAKE_FIELD.get(header)));
+            default -> stringify(null, data.get(HEADER_TO_INTAKE_FIELD.get(header)));
+        };
+    }
+
+    private String stringify(Object primary, Object fallback) {
+        Object value = primary != null ? primary : fallback;
+        return value == null ? "" : value.toString();
+    }
+
+    private Map<String, String> sanitizeTableValues(Map<String, Object> inputValues) {
+        Map<String, String> sanitized = new LinkedHashMap<>();
+        for (String header : TABLE_HEADERS) {
+            Object raw = inputValues == null ? null : inputValues.get(header);
+            sanitized.put(header, raw == null ? null : raw.toString().trim());
+        }
+        return sanitized;
     }
 
     private static void applyMap(IntakeForm target, Map<String, Object> values) {

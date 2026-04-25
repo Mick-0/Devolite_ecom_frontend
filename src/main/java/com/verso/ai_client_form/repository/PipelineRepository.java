@@ -210,6 +210,45 @@ public class PipelineRepository {
         ));
     }
 
+    public List<Map<String, Object>> listRowsForTable(UUID importId, int limit, String query, String sortBy, String sortDir) {
+        int capped = Math.max(1, Math.min(limit, 500));
+        String direction = "asc".equalsIgnoreCase(sortDir) ? "asc" : "desc";
+        String orderExpression = rowSortExpression(sortBy);
+        String sql = """
+            select r.id as row_id,
+                   r.row_number,
+                   r.project_name,
+                   r.company_name,
+                   r.contact_full_name,
+                   r.contact_email,
+                   r.contact_phone,
+                   r.crm_temperature,
+                   r.data_json::text as data_json,
+                   r.is_done,
+                   r.done_project_id,
+                   r.created_at,
+                   r.updated_at
+            from pipeline.pipeline_row r
+            where r.import_id = :id
+              and r.is_deleted = false
+              and (
+                coalesce(:query_like, '') = ''
+                or r.project_name ilike :query_like
+                or coalesce(r.company_name, '') ilike :query_like
+                or coalesce(r.contact_full_name, '') ilike :query_like
+                or coalesce(r.contact_email, '') ilike :query_like
+                or coalesce(r.contact_phone, '') ilike :query_like
+              )
+            order by %s %s nulls last, r.row_number asc
+            limit :limit
+            """.formatted(orderExpression, direction);
+        MapSqlParameterSource params = new MapSqlParameterSource()
+            .addValue("id", importId)
+            .addValue("limit", capped)
+            .addValue("query_like", hasText(query) ? "%" + query.trim() + "%" : null);
+        return jdbc.query(sql, params, new ColumnMapRowMapper());
+    }
+
     public Optional<String> findRowDataJson(UUID rowId) {
         String sql = """
             select data_json::text as data_json
@@ -218,6 +257,37 @@ public class PipelineRepository {
             """;
         return jdbc.query(sql, new MapSqlParameterSource("id", rowId), rs ->
             rs.next() ? Optional.ofNullable(rs.getString("data_json")) : Optional.empty()
+        );
+    }
+
+    public int updateRowTableData(UUID rowId,
+                                  String projectName,
+                                  String companyName,
+                                  String contactFullName,
+                                  String contactEmail,
+                                  String contactPhone,
+                                  String crmTemperature,
+                                  String dataJson) {
+        String sql = """
+            update pipeline.pipeline_row
+            set project_name = :project_name,
+                company_name = :company_name,
+                contact_full_name = :contact_full_name,
+                contact_email = :contact_email,
+                contact_phone = :contact_phone,
+                crm_temperature = :crm_temperature,
+                data_json = cast(:data_json as jsonb)
+            where id = :id and is_deleted = false
+            """;
+        return jdbc.update(sql, new MapSqlParameterSource()
+            .addValue("id", rowId)
+            .addValue("project_name", projectName)
+            .addValue("company_name", companyName)
+            .addValue("contact_full_name", contactFullName)
+            .addValue("contact_email", contactEmail)
+            .addValue("contact_phone", contactPhone)
+            .addValue("crm_temperature", crmTemperature)
+            .addValue("data_json", dataJson)
         );
     }
 

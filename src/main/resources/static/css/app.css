@@ -788,6 +788,125 @@ a.primary {
   border-radius: 12px;
 }
 
+.pipeline-view-switch {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pipeline-view-switch .secondary.is-active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  border-color: transparent;
+}
+
+.pipeline-table-wrap {
+  margin-top: 10px;
+}
+
+.pipeline-table-scroller {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.pipeline-table {
+  width: 100%;
+  min-width: 1350px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.pipeline-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, #faf8fd, #f3eefb);
+  color: var(--accent);
+  font-weight: 700;
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.pipeline-table tbody td {
+  padding: 8px;
+  border-bottom: 1px solid #eee7f7;
+  vertical-align: top;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.pipeline-table tbody tr:hover td {
+  background: #faf8fd;
+}
+
+.pipeline-table__meta {
+  min-width: 110px;
+  white-space: nowrap;
+}
+
+.pipeline-table__cell-input {
+  width: 100%;
+  min-width: 140px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+  background: #fff;
+}
+
+.pipeline-table__cell-input:focus {
+  outline: none;
+  border-color: rgba(125, 110, 176, 0.6);
+  box-shadow: 0 0 0 3px rgba(125, 110, 176, 0.12);
+}
+
+.pipeline-table__cell-input.is-dirty {
+  border-color: rgba(255, 160, 67, 0.9);
+  background: #fffaf1;
+}
+
+.pipeline-table__cell-input.is-saving {
+  border-color: rgba(125, 110, 176, 0.75);
+  background: #f6f1ff;
+}
+
+.pipeline-table__cell-input.is-error {
+  border-color: rgba(181, 72, 72, 0.9);
+  background: #fff2f2;
+}
+
+.pipeline-table__actions {
+  min-width: 180px;
+}
+
+.pipeline-table__actions-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.pipeline-table__actions-wrap button {
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.pipeline-table textarea.pipeline-table__cell-input {
+  min-height: 86px;
+  resize: vertical;
+}
+
+.pipeline-table__row-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 8px;
+  line-height: 1.35;
+}
+
 body.modal-open {
   overflow: hidden;
 }
