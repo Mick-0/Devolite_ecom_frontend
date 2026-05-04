@@ -93,15 +93,19 @@ public class IntakeForm {
     @Pattern(regexp = "^(?:formale|amichevole|tecnico|emozionale|altro)?$", message = "Seleziona un tono di voce valido.")
     private String toneOfVoice;
 
-    private Boolean marketingHasCrm;
-    private Boolean marketingKnowsCrm;
-    private Boolean marketingRunsAds;
-    private Boolean trackingGa4;
-    private Boolean trackingMetaPixel;
-    private Boolean trackingTiktokPixel;
+    private String crmSystemUrl;
+    private String ga4PropertyUrl;
+    private String googleAdsUrl;
+    private String metaBusinessUrl;
+    private String tiktokAdsUrl;
+    private String linkedinAdsUrl;
+    private String amazonStoreUrl;
+    private String ebayStoreUrl;
+    private String manomanoStoreUrl;
+    private String zalandoStoreUrl;
+    private String otherMarketingLinks;
+    private String otherMarketplaceLinks;
     private String marketingNotes;
-    private List<String> adChannels;
-    private List<String> marketplaceChannels;
 
     @Pattern(regexp = "^(?:presentazione_azienda|raccolta_contatti|richiesta_preventivi|prenotazioni|download_brochure|supporto_commerciale)?$", message = "Seleziona un obiettivo vetrina valido.")
     private String showcaseGoal;

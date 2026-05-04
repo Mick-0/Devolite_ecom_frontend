@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import com.verso.ai_client_form.model.ClientCompletionSummary;
 import com.verso.ai_client_form.model.IntakeForm;
 import com.verso.ai_client_form.model.ProjectSummary;
 import com.verso.ai_client_form.service.IntakeService;
@@ -109,6 +110,24 @@ public class IntakeController {
                                              @RequestParam(value = "sortDir", required = false) String sortDir) {
         int capped = (limit == null) ? 50 : Math.min(Math.max(limit, 1), 200);
         return intakeService.listRecentProjects(capped, query, sortBy, sortDir);
+    }
+
+    @GetMapping("/clients/active")
+    public String activeClientsPage(@RequestParam(value = "limit", required = false) Integer limit,
+                                    @RequestParam(value = "q", required = false) String query,
+                                    @RequestParam(value = "sortBy", required = false) String sortBy,
+                                    @RequestParam(value = "sortDir", required = false) String sortDir,
+                                    Model model) {
+        int capped = (limit == null) ? 100 : Math.min(Math.max(limit, 1), 200);
+        String effectiveSortBy = (sortBy == null || sortBy.isBlank()) ? "updatedAt" : sortBy;
+        String effectiveSortDir = "asc".equalsIgnoreCase(sortDir) ? "asc" : "desc";
+        List<ClientCompletionSummary> clients = intakeService.listCompletedClients(capped, query, effectiveSortBy, effectiveSortDir);
+        model.addAttribute("clients", clients);
+        model.addAttribute("query", query == null ? "" : query);
+        model.addAttribute("sortBy", effectiveSortBy);
+        model.addAttribute("sortDir", effectiveSortDir);
+        model.addAttribute("limit", capped);
+        return "clients-active";
     }
 
     @PostMapping(path = "/intake", consumes = "multipart/form-data")
@@ -241,12 +260,34 @@ public class IntakeController {
         }
     }
 
+    @PostMapping(path = "/intake/secret", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> revealSecret(@RequestBody SecretRequest request) {
+        if (request == null || request.projectId == null || request.secretKey == null || request.secretKey.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "projectId e secretKey sono obbligatori."));
+        }
+        try {
+            String value = intakeService.loadStoredSecret(request.projectId, request.secretKey);
+            if (value == null || value.isBlank()) {
+                return ResponseEntity.ok(Map.of("found", false, "message", "Nessuna credenziale salvata."));
+            }
+            return ResponseEntity.ok(Map.of("found", true, "value", value));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
+
     public static class ConfirmSectionRequest {
         public UUID draftId;
         public UUID projectId;
         public String sectionKey;
         public String projectName;
         public String projectKind;
+    }
+
+    public static class SecretRequest {
+        public UUID projectId;
+        public String secretKey;
     }
 }
 

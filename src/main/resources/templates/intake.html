@@ -12,7 +12,7 @@
 
 <link rel="stylesheet" th:href="@{/css/app.css(v=${@environment.getProperty('app.assets.version','1')})}" />
 </head>
-<body th:attr="data-enforce-section-lock=${enforceSectionLock}">
+<body th:attr="data-enforce-section-lock=${enforceSectionLock},data-confirmed-sections=${#strings.listJoin(confirmedSections, ',')}">
   <div class="app">
     <aside class="side">
       <h1 class="brand"><img src="/assets/brand/devolite_mark.png" th:src="@{/assets/brand/devolite_mark.png}" alt="Devolite" /></h1>
@@ -51,6 +51,7 @@
 	          <h2>Scheda Contatto</h2>
 	        </div>
 	        <div class="header-actions">
+            <a class="secondary" href="/dashboard">Dashboard</a>
 	          <button type="button" class="secondary" data-open-pipelines>Pipelines</button>
 	          <button type="button" class="secondary" data-open-existing>Modifica scheda esistente</button>
           <form th:action="@{/logout}" method="post" class="logout-form">
@@ -317,37 +318,63 @@
         <section id="marketing" class="card">
           <h3>Marketing</h3>
           <div class="grid">
-            <label class="check-row"><input type="checkbox" th:field="*{marketingHasCrm}" /> Ha CRM</label>
-            <label class="check-row"><input type="checkbox" th:field="*{marketingKnowsCrm}" /> Conosce CRM</label>
-            <label class="check-row"><input type="checkbox" th:field="*{marketingRunsAds}" /> Fa advertising</label>
+            <div class="field">
+              <label>CRM / pannello marketing</label>
+              <input type="url" th:field="*{crmSystemUrl}" placeholder="https://app.hubspot.com/..." />
+            </div>
+            <div class="field">
+              <label>GA4</label>
+              <input type="url" th:field="*{ga4PropertyUrl}" placeholder="https://analytics.google.com/..." />
+            </div>
+            <div class="field">
+              <label>Google Ads</label>
+              <input type="url" th:field="*{googleAdsUrl}" placeholder="https://ads.google.com/..." />
+            </div>
+            <div class="field">
+              <label>Meta Business / Business Manager</label>
+              <input type="url" th:field="*{metaBusinessUrl}" placeholder="https://business.facebook.com/..." />
+            </div>
+            <div class="field">
+              <label>TikTok Ads</label>
+              <input type="url" th:field="*{tiktokAdsUrl}" placeholder="https://ads.tiktok.com/..." />
+            </div>
+            <div class="field">
+              <label>LinkedIn Campaign Manager</label>
+              <input type="url" th:field="*{linkedinAdsUrl}" placeholder="https://www.linkedin.com/campaignmanager/..." />
+            </div>
           </div>
           <div class="grid">
-            <label class="check-row"><input type="checkbox" th:field="*{trackingGa4}" /> GA4</label>
-            <label class="check-row"><input type="checkbox" th:field="*{trackingMetaPixel}" /> Meta Pixel</label>
-            <label class="check-row"><input type="checkbox" th:field="*{trackingTiktokPixel}" /> TikTok Pixel</label>
-          </div>
-          <div class="grid-1">
-            <div class="field"><label>Note marketing</label><textarea th:field="*{marketingNotes}" placeholder="Budget ADV ~1000 EUR/mese."></textarea></div>
-          </div>
-          <div class="grid-1">
-            <label>Canali ADV</label>
-            <div class="pill-group">
-              <label class="pill"><input type="checkbox" th:field="*{adChannels}" value="instagram" /> Instagram</label>
-              <label class="pill"><input type="checkbox" th:field="*{adChannels}" value="facebook" /> Facebook</label>
-              <label class="pill"><input type="checkbox" th:field="*{adChannels}" value="tiktok" /> TikTok</label>
-              <label class="pill"><input type="checkbox" th:field="*{adChannels}" value="linkedin" /> LinkedIn</label>
-              <label class="pill"><input type="checkbox" th:field="*{adChannels}" value="google" /> Google</label>
+            <div class="field">
+              <label>Amazon</label>
+              <input type="url" th:field="*{amazonStoreUrl}" placeholder="https://www.amazon.it/shops/..." />
+            </div>
+            <div class="field">
+              <label>eBay</label>
+              <input type="url" th:field="*{ebayStoreUrl}" placeholder="https://www.ebay.it/str/..." />
+            </div>
+            <div class="field">
+              <label>ManoMano</label>
+              <input type="url" th:field="*{manomanoStoreUrl}" placeholder="https://www.manomano.it/..." />
+            </div>
+            <div class="field">
+              <label>Zalando</label>
+              <input type="url" th:field="*{zalandoStoreUrl}" placeholder="https://www.zalando.it/..." />
             </div>
           </div>
           <div class="grid-1">
-            <label>Canali marketplace</label>
-            <div class="pill-group">
-              <label class="pill"><input type="checkbox" th:field="*{marketplaceChannels}" value="amazon" /> Amazon</label>
-              <label class="pill"><input type="checkbox" th:field="*{marketplaceChannels}" value="ebay" /> eBay</label>
-              <label class="pill"><input type="checkbox" th:field="*{marketplaceChannels}" value="manomano" /> ManoMano</label>
-              <label class="pill"><input type="checkbox" th:field="*{marketplaceChannels}" value="zalando" /> Zalando</label>
-              <label class="pill"><input type="checkbox" th:field="*{marketplaceChannels}" value="altro" /> Altro</label>
+            <div class="field">
+              <label>Altri link marketing</label>
+              <textarea th:field="*{otherMarketingLinks}" placeholder="Uno per riga: landing, Business Suite, tool newsletter, report ADV, ecc."></textarea>
             </div>
+          </div>
+          <div class="grid-1">
+            <div class="field">
+              <label>Altri link marketplace</label>
+              <textarea th:field="*{otherMarketplaceLinks}" placeholder="Uno per riga: altri storefront, comparatori, marketplace di nicchia, ecc."></textarea>
+            </div>
+          </div>
+          <div class="grid-1">
+            <div class="field"><label>Note marketing</label><textarea th:field="*{marketingNotes}" placeholder="Budget ADV, account da recuperare, accessi mancanti, note operative."></textarea></div>
           </div>
         </section>
 
@@ -493,6 +520,10 @@
             <div class="field">
               <label>Password / Token (opzionale)</label>
               <input type="password" th:field="*{existingDomainCredentialSecret}" placeholder="Lascia vuoto per non salvare/modificare" autocomplete="new-password" />
+              <div class="inline-row" th:if="*{projectId != null}" style="margin-top:8px;">
+                <button type="button" class="secondary secondary--ghost" data-secret-reveal="existingDomainCredentialSecret">Mostra salvata</button>
+                <span class="note" data-secret-status="existingDomainCredentialSecret"></span>
+              </div>
             </div>
           </div>
 
@@ -585,8 +616,8 @@
             <label class="check-row"><input type="checkbox" th:field="*{aiSeoIndexingEnabled}" /> Indicizzazione SEO attiva</label>
           </div>
           <div class="grid">
-            <div class="field"><label>Crediti SEO totali</label><input type="number" th:field="*{aiSeoCreditsTotal}" placeholder="100" min="0" required /></div>
-            <div class="field"><label>Crediti SEO usati</label><input type="number" th:field="*{aiSeoCreditsUsed}" placeholder="20" min="0" required /></div>
+	            <div class="field"><label>Crediti SEO totali</label><input type="number" th:field="*{aiSeoCreditsTotal}" placeholder="100" min="0" /></div>
+	            <div class="field"><label>Crediti SEO usati</label><input type="number" th:field="*{aiSeoCreditsUsed}" placeholder="20" min="0" /></div>
           </div>
         </section>
 
@@ -666,11 +697,15 @@
 	              <label>Username / ID (se serve)</label>
 	              <input type="text" th:field="*{ecomPanelCredentialUsername}" placeholder="mario.rossi" autocomplete="off" />
 	            </div>
-	            <div class="field">
-	              <label>Password / Token (opzionale)</label>
-	              <input type="password" th:field="*{ecomPanelCredentialSecret}" placeholder="Lascia vuoto per non salvare/modificare" autocomplete="new-password" />
-	            </div>
-	          </div>
+		            <div class="field">
+		              <label>Password / Token (opzionale)</label>
+		              <input type="password" th:field="*{ecomPanelCredentialSecret}" placeholder="Lascia vuoto per non salvare/modificare" autocomplete="new-password" />
+                  <div class="inline-row" th:if="*{projectId != null}" style="margin-top:8px;">
+                    <button type="button" class="secondary secondary--ghost" data-secret-reveal="ecomPanelCredentialSecret">Mostra salvata</button>
+                    <span class="note" data-secret-status="ecomPanelCredentialSecret"></span>
+                  </div>
+		            </div>
+		          </div>
 	          <div class="grid" data-ecom-panel-credential-fields>
 	            <label class="check-row"><input type="checkbox" th:field="*{ecomPanelTwoFactorEnabled}" /> 2FA attivo</label>
 	            <div class="field">
@@ -831,10 +866,6 @@
       </div>
     </main>
   </div>
-  <script th:inline="javascript">
-    window.__confirmedSections = /*[[${confirmedSections}]]*/ [];
-    window.__enforceSectionLock = /*[[${enforceSectionLock}]]*/ true;
-  </script>
   <script th:src="@{/js/app.js(v=${@environment.getProperty('app.assets.version','1')})}"></script>
 </body>
 </html>

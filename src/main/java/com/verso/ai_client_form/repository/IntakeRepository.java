@@ -265,10 +265,18 @@ public class IntakeRepository {
         String sql = """
             insert into marketing.profile
                 (project_id, has_crm, knows_crm, runs_ads,
-                 tracking_ga4, tracking_meta_pixel, tracking_tiktok_pixel, notes)
+                 tracking_ga4, tracking_meta_pixel, tracking_tiktok_pixel,
+                 crm_system_url, ga4_property_url, google_ads_url, meta_business_url,
+                 tiktok_ads_url, linkedin_ads_url, amazon_store_url, ebay_store_url,
+                 manomano_store_url, zalando_store_url, other_marketing_links,
+                 other_marketplace_links, notes)
             values
                 (:project_id, :has_crm, :knows_crm, :runs_ads,
-                 :tracking_ga4, :tracking_meta_pixel, :tracking_tiktok_pixel, :notes)
+                 :tracking_ga4, :tracking_meta_pixel, :tracking_tiktok_pixel,
+                 :crm_system_url, :ga4_property_url, :google_ads_url, :meta_business_url,
+                 :tiktok_ads_url, :linkedin_ads_url, :amazon_store_url, :ebay_store_url,
+                 :manomano_store_url, :zalando_store_url, :other_marketing_links,
+                 :other_marketplace_links, :notes)
             on conflict (project_id) do update set
                 has_crm = excluded.has_crm,
                 knows_crm = excluded.knows_crm,
@@ -276,6 +284,18 @@ public class IntakeRepository {
                 tracking_ga4 = excluded.tracking_ga4,
                 tracking_meta_pixel = excluded.tracking_meta_pixel,
                 tracking_tiktok_pixel = excluded.tracking_tiktok_pixel,
+                crm_system_url = excluded.crm_system_url,
+                ga4_property_url = excluded.ga4_property_url,
+                google_ads_url = excluded.google_ads_url,
+                meta_business_url = excluded.meta_business_url,
+                tiktok_ads_url = excluded.tiktok_ads_url,
+                linkedin_ads_url = excluded.linkedin_ads_url,
+                amazon_store_url = excluded.amazon_store_url,
+                ebay_store_url = excluded.ebay_store_url,
+                manomano_store_url = excluded.manomano_store_url,
+                zalando_store_url = excluded.zalando_store_url,
+                other_marketing_links = excluded.other_marketing_links,
+                other_marketplace_links = excluded.other_marketplace_links,
                 notes = excluded.notes
             """;
         MapSqlParameterSource params = new MapSqlParameterSource(data)
@@ -783,6 +803,20 @@ public class IntakeRepository {
         return queryForMapOptional("select * from dominio.domain_setup where project_id = :id", Map.of("id", projectId));
     }
 
+    public void updateDomainSecrets(UUID projectId, String existingSecret, String newSecret) {
+        String sql = """
+            update dominio.domain_setup
+            set existing_credential_secret = coalesce(:existing_secret, existing_credential_secret),
+                new_credential_secret = coalesce(:new_secret, new_credential_secret)
+            where project_id = :project_id
+            """;
+        jdbc.update(sql, new MapSqlParameterSource()
+            .addValue("project_id", projectId)
+            .addValue("existing_secret", existingSecret)
+            .addValue("new_secret", newSecret)
+        );
+    }
+
     public Optional<Map<String, Object>> findGoogleBusiness(UUID projectId) {
         return queryForMapOptional("select * from local_business.google_business_setup where project_id = :id", Map.of("id", projectId));
     }
@@ -809,6 +843,18 @@ public class IntakeRepository {
 
     public Optional<Map<String, Object>> findStoreSetup(UUID projectId) {
         return queryForMapOptional("select * from ecommerce.store_setup where project_id = :id", Map.of("id", projectId));
+    }
+
+    public void updateStorePanelSecret(UUID projectId, String secret) {
+        String sql = """
+            update ecommerce.store_setup
+            set ecom_panel_credential_secret = :secret
+            where project_id = :project_id
+            """;
+        jdbc.update(sql, new MapSqlParameterSource()
+            .addValue("project_id", projectId)
+            .addValue("secret", secret)
+        );
     }
 
     public List<String> findPaymentMethods(UUID projectId) {

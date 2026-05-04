@@ -40,7 +40,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Controller
 public class DomainController {
 
-    // Basic hostname validation (no scheme, no path).
     private static final Pattern HOST_RE = Pattern.compile(
         "^(?=.{1,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,63}$"
     );
@@ -52,8 +51,6 @@ public class DomainController {
     private static final Object BOOTSTRAP_LOCK = new Object();
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    // A small curated list (fast path) for common TLDs we see in Italy.
-    // These are base URLs that already include the "domain/" segment.
     private static final Map<String, List<String>> RDAP_FASTPATH = Map.of(
         "it", List.of("https://rdap.nic.it/domain/"),
         "com", List.of("https://rdap.verisign.com/com/v1/domain/"),
@@ -90,7 +87,9 @@ public class DomainController {
 
         List<String> ips = new ArrayList<>();
         for (InetAddress addr : addresses) {
-            if (addr == null) continue;
+            if (addr == null) {
+                continue;
+            }
             if (isPrivateOrLocal(addr)) {
                 return ResponseEntity.ok(Map.of(
                     "ok", false,
@@ -156,26 +155,24 @@ public class DomainController {
         boolean registered = false;
         boolean invalid = false;
 
-        // Try up to 5 RDAP providers/endpoints. Early exit if we find "registered".
         for (int i = 0; i < Math.min(endpoints.size(), 5); i++) {
             String url = endpoints.get(i);
-            RdapProbe p = rdapProbe(client, url);
-            probes.add(p);
-            if (p.classification.equals("registered")) {
+            RdapProbe probe = rdapProbe(client, url);
+            probes.add(probe);
+            if (probe.classification.equals("registered")) {
                 registered = true;
                 break;
             }
-            if (p.classification.equals("available")) {
+            if (probe.classification.equals("available")) {
                 availableCount++;
-                if (!isAggregator(p.url)) {
+                if (!isAggregator(probe.url)) {
                     strongAvailableCount++;
                 }
-                // Two independent 404s are usually enough to say "available" with good confidence.
                 if (availableCount >= 2) {
                     break;
                 }
             }
-            if (p.classification.equals("invalid")) {
+            if (probe.classification.equals("invalid")) {
                 invalid = true;
             }
         }
@@ -189,8 +186,6 @@ public class DomainController {
             ));
         }
 
-        // Guardrail: a registered domain can have no A/AAAA records yet, but it will still have DNS delegation (NS/SOA).
-        // If we can observe NS/SOA, it is NOT "available" even if RDAP providers disagree.
         DnsDelegation delegation = dnsDelegation(normalized);
         if (delegation.delegated) {
             return ResponseEntity.ok(Map.of(
@@ -202,7 +197,6 @@ public class DomainController {
         }
 
         if (strongAvailableCount >= 1 && availableCount >= 2) {
-            // Extra guardrail: if the domain is actually reachable (DNS+HTTP), it's registered.
             SanityReachability sanity = sanityReachability(client, normalized);
             if (sanity.reachable) {
                 return ResponseEntity.ok(Map.of(
@@ -236,7 +230,6 @@ public class DomainController {
             ));
         }
 
-        // Fallback: DNS resolution (not definitive, but useful).
         try {
             InetAddress[] addresses = InetAddress.getAllByName(normalized);
             if (addresses != null && addresses.length > 0) {
@@ -248,7 +241,6 @@ public class DomainController {
                 ));
             }
         } catch (Exception ignored) {
-            // ignored
         }
 
         return ResponseEntity.ok(Map.of(
@@ -268,7 +260,6 @@ public class DomainController {
         }
 
         Set<String> out = new LinkedHashSet<>();
-        // Common TLDs for Italian clients.
         out.add(base + ".it");
         out.add(base + ".com");
         out.add(base + "-shop.it");
@@ -285,20 +276,19 @@ public class DomainController {
         if (raw == null) {
             throw new IllegalArgumentException("Inserisci un dominio.");
         }
-        String v = raw.trim();
-        if (v.isEmpty()) {
+        String value = raw.trim();
+        if (value.isEmpty()) {
             throw new IllegalArgumentException("Inserisci un dominio.");
         }
-        // Do not accept URLs or paths (avoid SSRF vectors).
-        if (v.contains("://") || v.contains("/") || v.contains("?") || v.contains("#")) {
+        if (value.contains("://") || value.contains("/") || value.contains("?") || value.contains("#")) {
             throw new IllegalArgumentException("Inserisci solo il dominio (es. acme.it), senza https:// o percorsi.");
         }
-        v = v.replaceAll("\\s+", "");
-        v = v.replaceAll("^\\.+|\\.+$", "");
-        if (v.equalsIgnoreCase("localhost")) {
+        value = value.replaceAll("\\s+", "");
+        value = value.replaceAll("^\\.+|\\.+$", "");
+        if (value.equalsIgnoreCase("localhost")) {
             throw new IllegalArgumentException("Dominio non valido.");
         }
-        String ascii = IDN.toASCII(v, IDN.ALLOW_UNASSIGNED).toLowerCase();
+        String ascii = IDN.toASCII(value, IDN.ALLOW_UNASSIGNED).toLowerCase();
         if (!HOST_RE.matcher(ascii).matches()) {
             throw new IllegalArgumentException("Dominio non valido. Esempio: acme.it");
         }
@@ -321,9 +311,9 @@ public class DomainController {
                 .GET()
                 .build();
             HttpResponse<Void> resp = client.send(req, HttpResponse.BodyHandlers.discarding());
-            int s = resp.statusCode();
-            boolean ok = s >= 200 && s < 500;
-            return new ProbeResult(ok, s, null);
+            int status = resp.statusCode();
+            boolean ok = status >= 200 && status < 500;
+            return new ProbeResult(ok, status, null);
         } catch (Exception ex) {
             return new ProbeResult(false, null, ex.getClass().getSimpleName());
         }
@@ -331,23 +321,16 @@ public class DomainController {
 
     private List<String> rdapEndpointsFor(String domain, String tld, HttpClient client) {
         Set<String> endpoints = new LinkedHashSet<>();
-
-        // Fast path (authoritative or well-known).
         for (String base : RDAP_FASTPATH.getOrDefault(tld, List.of())) {
             endpoints.add(base + domain);
         }
-
-        // Bootstrap (IANA) can add authoritative RDAP bases for many TLDs.
         for (String base : rdapBasesFromBootstrap(tld, client)) {
-            String ep = toRdapDomainEndpoint(base, domain);
-            if (ep != null) {
-                endpoints.add(ep);
+            String endpoint = toRdapDomainEndpoint(base, domain);
+            if (endpoint != null) {
+                endpoints.add(endpoint);
             }
         }
-
-        // Aggregator fallback.
         endpoints.add("https://rdap.org/domain/" + domain);
-
         return new ArrayList<>(endpoints);
     }
 
@@ -401,18 +384,28 @@ public class DomainController {
                     continue;
                 }
                 List<String> bases = new ArrayList<>();
-                for (JsonNode b : basesNode) {
-                    if (b == null || !b.isTextual()) continue;
-                    String base = b.asText();
-                    if (base == null || base.isBlank()) continue;
+                for (JsonNode baseNode : basesNode) {
+                    if (baseNode == null || !baseNode.isTextual()) {
+                        continue;
+                    }
+                    String base = baseNode.asText();
+                    if (base == null || base.isBlank()) {
+                        continue;
+                    }
                     bases.add(base);
                 }
-                if (bases.isEmpty()) continue;
-                for (JsonNode t : tldsNode) {
-                    if (t == null || !t.isTextual()) continue;
-                    String tld = t.asText().toLowerCase();
-                    if (tld.isBlank()) continue;
-                    map.put(tld, Collections.unmodifiableList(bases));
+                if (bases.isEmpty()) {
+                    continue;
+                }
+                for (JsonNode tldNode : tldsNode) {
+                    if (tldNode == null || !tldNode.isTextual()) {
+                        continue;
+                    }
+                    String currentTld = tldNode.asText().toLowerCase();
+                    if (currentTld.isBlank()) {
+                        continue;
+                    }
+                    map.put(currentTld, Collections.unmodifiableList(bases));
                 }
             }
             return Collections.unmodifiableMap(map);
@@ -422,14 +415,17 @@ public class DomainController {
     }
 
     private String toRdapDomainEndpoint(String base, String domain) {
-        if (base == null || base.isBlank()) return null;
-        String b = base.trim();
-        // Bootstrap bases typically end with "/". Ensure single slash.
-        if (!b.endsWith("/")) b = b + "/";
-        // If base already includes "domain/" then just append the name.
-        if (b.contains("/domain/")) return b + domain;
-        // Most RDAP bases expect "/domain/".
-        return b + "domain/" + domain;
+        if (base == null || base.isBlank()) {
+            return null;
+        }
+        String normalized = base.trim();
+        if (!normalized.endsWith("/")) {
+            normalized = normalized + "/";
+        }
+        if (normalized.contains("/domain/")) {
+            return normalized + domain;
+        }
+        return normalized + "domain/" + domain;
     }
 
     private RdapProbe rdapProbe(HttpClient client, String url) {
@@ -442,17 +438,17 @@ public class DomainController {
                 .GET()
                 .build();
             HttpResponse<Void> resp = client.send(req, HttpResponse.BodyHandlers.discarding());
-            int s = resp.statusCode();
-            if (s == 404) {
-                return new RdapProbe(url, s, "available", null);
+            int status = resp.statusCode();
+            if (status == 404) {
+                return new RdapProbe(url, status, "available", null);
             }
-            if (s >= 200 && s < 300) {
-                return new RdapProbe(url, s, "registered", null);
+            if (status >= 200 && status < 300) {
+                return new RdapProbe(url, status, "registered", null);
             }
-            if (s == 400) {
-                return new RdapProbe(url, s, "invalid", null);
+            if (status == 400) {
+                return new RdapProbe(url, status, "invalid", null);
             }
-            return new RdapProbe(url, s, "unknown", null);
+            return new RdapProbe(url, status, "unknown", null);
         } catch (Exception ex) {
             return new RdapProbe(url, null, "unknown", ex.getClass().getSimpleName());
         }
@@ -463,19 +459,25 @@ public class DomainController {
             return "Nessun provider RDAP disponibile.";
         }
         StringBuilder sb = new StringBuilder();
-        for (RdapProbe p : probes) {
-            if (sb.length() > 0) sb.append(" | ");
-            sb.append(shortHost(p.url)).append(":").append(p.classification);
-            if (p.statusCode != null) sb.append("(").append(p.statusCode).append(")");
-            if (p.error != null) sb.append("[").append(p.error).append("]");
+        for (RdapProbe probe : probes) {
+            if (sb.length() > 0) {
+                sb.append(" | ");
+            }
+            sb.append(shortHost(probe.url)).append(":").append(probe.classification);
+            if (probe.statusCode != null) {
+                sb.append("(").append(probe.statusCode).append(")");
+            }
+            if (probe.error != null) {
+                sb.append("[").append(probe.error).append("]");
+            }
         }
         return sb.toString();
     }
 
     private String shortHost(String url) {
         try {
-            URI u = URI.create(url);
-            String host = u.getHost();
+            URI uri = URI.create(url);
+            String host = uri.getHost();
             return host == null ? "rdap" : host;
         } catch (Exception ex) {
             return "rdap";
@@ -484,8 +486,8 @@ public class DomainController {
 
     private boolean isAggregator(String url) {
         try {
-            URI u = URI.create(url);
-            String host = u.getHost();
+            URI uri = URI.create(url);
+            String host = uri.getHost();
             return host != null && host.toLowerCase().endsWith("rdap.org");
         } catch (Exception ex) {
             return false;
@@ -500,7 +502,9 @@ public class DomainController {
             }
             List<String> ips = new ArrayList<>();
             for (InetAddress addr : addresses) {
-                if (addr == null) continue;
+                if (addr == null) {
+                    continue;
+                }
                 if (isPrivateOrLocal(addr)) {
                     return new SanityReachability(false, "Sanity: DNS IP non pubblico (" + addr.getHostAddress() + ")");
                 }
@@ -525,11 +529,13 @@ public class DomainController {
     }
 
     private String slugify(String raw) {
-        if (raw == null) return "";
-        String v = raw.trim().toLowerCase();
-        v = v.replaceAll("[^a-z0-9]+", "-");
-        v = v.replaceAll("(^-+|-+$)", "");
-        return v;
+        if (raw == null) {
+            return "";
+        }
+        String value = raw.trim().toLowerCase();
+        value = value.replaceAll("[^a-z0-9]+", "-");
+        value = value.replaceAll("(^-+|-+$)", "");
+        return value;
     }
 
     private DnsDelegation dnsDelegation(String domain) {
@@ -537,7 +543,6 @@ public class DomainController {
             return new DnsDelegation(false, "DNS: dominio vuoto");
         }
         try {
-            // JNDI DNS lookups can sometimes hang on misconfigured resolvers. Keep it bounded.
             return CompletableFuture
                 .supplyAsync(() -> dnsDelegationBlocking(domain))
                 .orTimeout(1500, TimeUnit.MILLISECONDS)
@@ -596,8 +601,12 @@ public class DomainController {
     private record ProbeResult(boolean ok, Integer status, String error) {
         @Override
         public String toString() {
-            if (ok) return "ok(" + status + ")";
-            if (status != null) return "fail(" + status + ")";
+            if (ok) {
+                return "ok(" + status + ")";
+            }
+            if (status != null) {
+                return "fail(" + status + ")";
+            }
             return "err(" + error + ")";
         }
     }

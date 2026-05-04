@@ -15,6 +15,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 import com.verso.ai_client_form.repository.IntakeRepository;
 import com.verso.ai_client_form.repository.StaffUserRepository;
+import com.verso.ai_client_form.model.ClientCompletionSummary;
 import com.verso.ai_client_form.model.IntakeForm;
 import com.verso.ai_client_form.model.ProjectSummary;
 
@@ -25,6 +26,8 @@ public class IntakeService {
     private final StaffUserRepository staffRepo;
     private final StorageService storageService;
     private final PipelineService pipelineService;
+    private final SecretCipherService secretCipherService;
+    private final FormCompletionService formCompletionService;
 
     @Value("${app.intake.enforce-section-order:true}")
     private boolean enforceSectionOrder;
@@ -34,11 +37,18 @@ public class IntakeService {
         "vetrina", "site", "domain", "local", "commercial", "ai", "ecommerce", "files"
     );
 
-    public IntakeService(IntakeRepository repo, StaffUserRepository staffRepo, StorageService storageService, PipelineService pipelineService) {
+    public IntakeService(IntakeRepository repo,
+                         StaffUserRepository staffRepo,
+                         StorageService storageService,
+                         PipelineService pipelineService,
+                         SecretCipherService secretCipherService,
+                         FormCompletionService formCompletionService) {
         this.repo = repo;
         this.staffRepo = staffRepo;
         this.storageService = storageService;
         this.pipelineService = pipelineService;
+        this.secretCipherService = secretCipherService;
+        this.formCompletionService = formCompletionService;
     }
 
     public boolean isEnforceSectionOrder() {
@@ -62,6 +72,48 @@ public class IntakeService {
     @Transactional(readOnly = true)
     public List<ProjectSummary> listRecentProjects(int limit, String query, String sortBy, String sortDir) {
         return repo.listRecentProjects(limit, query, sortBy, sortDir);
+    }
+
+    @Transactional
+    public List<ClientCompletionSummary> listCompletedClients(int limit, String query, String sortBy, String sortDir) {
+        int capped = Math.max(1, Math.min(limit, 200));
+        int fetchLimit = Math.max(capped * 5, 500);
+        fetchLimit = Math.min(fetchLimit, 1000);
+        List<ProjectSummary> candidates = repo.listRecentProjects(fetchLimit, query, sortBy, sortDir);
+        List<ClientCompletionSummary> completed = new java.util.ArrayList<>();
+        for (ProjectSummary summary : candidates) {
+            if (summary == null || summary.projectId() == null) {
+                continue;
+            }
+            IntakeForm form = load(summary.projectId());
+            boolean storedExistingDomainSecretPresent = repo.findDomainSetup(summary.projectId())
+                .map(row -> row.get("existing_credential_secret"))
+                .map(value -> value instanceof String s && !s.isBlank())
+                .orElse(false);
+            FormCompletionService.CompletionStats stats = formCompletionService.calculate(form, storedExistingDomainSecretPresent);
+            if (!stats.isComplete()) {
+                continue;
+            }
+            completed.add(new ClientCompletionSummary(
+                summary.projectId(),
+                summary.projectName(),
+                summary.companyName(),
+                summary.projectKind(),
+                summary.projectStatus(),
+                summary.vatNumber(),
+                summary.city(),
+                summary.contactName(),
+                summary.contactEmail(),
+                summary.updatedAt(),
+                stats.progressPercent(),
+                stats.completedFields(),
+                stats.totalFields()
+            ));
+            if (completed.size() >= capped) {
+                break;
+            }
+        }
+        return completed;
     }
 
     @Transactional
@@ -155,17 +207,26 @@ public class IntakeService {
         ));
 
         repo.upsertMarketingProfile(projectId, map(
-            "has_crm", bool(form.getMarketingHasCrm()),
-            "knows_crm", bool(form.getMarketingKnowsCrm()),
-            "runs_ads", bool(form.getMarketingRunsAds()),
-            "tracking_ga4", bool(form.getTrackingGa4()),
-            "tracking_meta_pixel", bool(form.getTrackingMetaPixel()),
-            "tracking_tiktok_pixel", bool(form.getTrackingTiktokPixel()),
-            "notes", form.getMarketingNotes()
+            "has_crm", notBlank(form.getCrmSystemUrl()),
+            "knows_crm", notBlank(form.getCrmSystemUrl()),
+            "runs_ads", hasMarketingAds(form),
+            "tracking_ga4", notBlank(form.getGa4PropertyUrl()),
+            "tracking_meta_pixel", notBlank(form.getMetaBusinessUrl()),
+            "tracking_tiktok_pixel", notBlank(form.getTiktokAdsUrl()),
+            "crm_system_url", emptyToNull(form.getCrmSystemUrl()),
+            "ga4_property_url", emptyToNull(form.getGa4PropertyUrl()),
+            "google_ads_url", emptyToNull(form.getGoogleAdsUrl()),
+            "meta_business_url", emptyToNull(form.getMetaBusinessUrl()),
+            "tiktok_ads_url", emptyToNull(form.getTiktokAdsUrl()),
+            "linkedin_ads_url", emptyToNull(form.getLinkedinAdsUrl()),
+            "amazon_store_url", emptyToNull(form.getAmazonStoreUrl()),
+            "ebay_store_url", emptyToNull(form.getEbayStoreUrl()),
+            "manomano_store_url", emptyToNull(form.getManomanoStoreUrl()),
+            "zalando_store_url", emptyToNull(form.getZalandoStoreUrl()),
+            "other_marketing_links", emptyToNull(form.getOtherMarketingLinks()),
+            "other_marketplace_links", emptyToNull(form.getOtherMarketplaceLinks()),
+            "notes", emptyToNull(form.getMarketingNotes())
         ));
-
-        repo.replaceAdChannels(projectId, nullToEmpty(form.getAdChannels()));
-        repo.replaceMarketplaceChannels(projectId, nullToEmpty(form.getMarketplaceChannels()));
 
         if ("vetrina".equalsIgnoreCase(projectKind)) {
             Integer showcasePageCount = form.getShowcasePageCount();
@@ -202,7 +263,7 @@ public class IntakeService {
             "existing_has_credentials", bool(form.getExistingDomainHasCredentials()),
             "existing_credential_username", emptyToNull(form.getExistingDomainCredentialUsername()),
             "existing_credential_email", emptyToNull(form.getExistingDomainCredentialEmail()),
-            "existing_credential_secret", emptyToNull(form.getExistingDomainCredentialSecret()),
+            "existing_credential_secret", encryptSecret(form.getExistingDomainCredentialSecret()),
             "existing_two_factor_enabled", bool(form.getExistingDomainTwoFactorEnabled()),
             "existing_nameservers", emptyToNull(form.getExistingDomainNameservers()),
             "existing_expiry_date", form.getExistingDomainExpiryDate(),
@@ -212,7 +273,7 @@ public class IntakeService {
             "new_registrar", emptyToNull(form.getNewDomainRegistrar()),
             "new_credential_username", emptyToNull(form.getNewDomainCredentialUsername()),
             "new_credential_email", emptyToNull(form.getNewDomainCredentialEmail()),
-            "new_credential_secret", emptyToNull(form.getNewDomainCredentialSecret()),
+            "new_credential_secret", encryptSecret(form.getNewDomainCredentialSecret()),
             "willing_to_register_new_domain", bool(form.getWillingToRegisterNewDomain()),
             "domain_issues", emptyToNull(form.getDomainIssues()),
             "domain_problem_severity", form.getDomainProblemSeverity(),
@@ -316,7 +377,7 @@ public class IntakeService {
 	            String panelUrl = emptyToNull(form.getEcomPanelUrl());
 	            String panelEmail = emptyToNull(form.getEcomPanelCredentialEmail());
 	            String panelUser = emptyToNull(form.getEcomPanelCredentialUsername());
-	            String panelSecret = emptyToNull(form.getEcomPanelCredentialSecret());
+	            String panelSecret = encryptSecret(form.getEcomPanelCredentialSecret());
 	            boolean panel2fa = bool(form.getEcomPanelTwoFactorEnabled());
 	            String panelNotes = emptyToNull(form.getEcomPanelNotes());
 	            if (!panelHasCreds) {
@@ -437,7 +498,7 @@ public class IntakeService {
         repo.markSectionsPending(draftId, toReset, staffUserId);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public IntakeForm load(UUID projectId) {
         IntakeForm form = new IntakeForm();
         repo.findProject(projectId).ifPresent(row -> {
@@ -523,16 +584,20 @@ public class IntakeService {
         });
 
         repo.findMarketingProfile(projectId).ifPresent(row -> {
-            form.setMarketingHasCrm(toBoolean(row.get("has_crm")));
-            form.setMarketingKnowsCrm(toBoolean(row.get("knows_crm")));
-            form.setMarketingRunsAds(toBoolean(row.get("runs_ads")));
-            form.setTrackingGa4(toBoolean(row.get("tracking_ga4")));
-            form.setTrackingMetaPixel(toBoolean(row.get("tracking_meta_pixel")));
-            form.setTrackingTiktokPixel(toBoolean(row.get("tracking_tiktok_pixel")));
+            form.setCrmSystemUrl((String) row.get("crm_system_url"));
+            form.setGa4PropertyUrl((String) row.get("ga4_property_url"));
+            form.setGoogleAdsUrl((String) row.get("google_ads_url"));
+            form.setMetaBusinessUrl((String) row.get("meta_business_url"));
+            form.setTiktokAdsUrl((String) row.get("tiktok_ads_url"));
+            form.setLinkedinAdsUrl((String) row.get("linkedin_ads_url"));
+            form.setAmazonStoreUrl((String) row.get("amazon_store_url"));
+            form.setEbayStoreUrl((String) row.get("ebay_store_url"));
+            form.setManomanoStoreUrl((String) row.get("manomano_store_url"));
+            form.setZalandoStoreUrl((String) row.get("zalando_store_url"));
+            form.setOtherMarketingLinks((String) row.get("other_marketing_links"));
+            form.setOtherMarketplaceLinks((String) row.get("other_marketplace_links"));
             form.setMarketingNotes((String) row.get("notes"));
         });
-        form.setAdChannels(repo.findAdChannels(projectId));
-        form.setMarketplaceChannels(repo.findMarketplaceChannels(projectId));
 
         repo.findShowcaseBrief(projectId).ifPresent(row -> {
             form.setShowcaseGoal((String) row.get("site_goal"));
@@ -594,6 +659,7 @@ public class IntakeService {
         });
 
         repo.findDomainSetup(projectId).ifPresent(row -> {
+            upgradeLegacyDomainSecrets(projectId, row);
             form.setHasExistingDomain(toBoolean(row.get("has_existing_domain")));
             form.setExistingDomain((String) row.get("existing_domain"));
             form.setExistingDomainRegistrar((String) row.get("existing_registrar"));
@@ -658,6 +724,7 @@ public class IntakeService {
         });
 
 	        repo.findStoreSetup(projectId).ifPresent(row -> {
+            upgradeLegacyStoreSecret(projectId, row);
 	            form.setPurchaseEnabled(toBoolean(row.get("purchase_enabled")));
 	            form.setAutoRenewalEnabled(toBoolean(row.get("auto_renewal_enabled")));
 	            form.setRidEnabled(toBoolean(row.get("rid_enabled")));
@@ -685,6 +752,34 @@ public class IntakeService {
         form.setProductCategories(String.join(", ", repo.findCategories(projectId)));
 
         return form;
+    }
+
+    @Transactional
+    public String loadStoredSecret(UUID projectId, String secretKey) {
+        if (projectId == null || secretKey == null || secretKey.isBlank()) {
+            return null;
+        }
+        return switch (secretKey) {
+            case "existingDomainCredentialSecret" -> repo.findDomainSetup(projectId)
+                .map(row -> {
+                    upgradeLegacyDomainSecrets(projectId, row);
+                    return decryptSecret(row.get("existing_credential_secret"));
+                })
+                .orElse(null);
+            case "newDomainCredentialSecret" -> repo.findDomainSetup(projectId)
+                .map(row -> {
+                    upgradeLegacyDomainSecrets(projectId, row);
+                    return decryptSecret(row.get("new_credential_secret"));
+                })
+                .orElse(null);
+            case "ecomPanelCredentialSecret" -> repo.findStoreSetup(projectId)
+                .map(row -> {
+                    upgradeLegacyStoreSecret(projectId, row);
+                    return decryptSecret(row.get("ecom_panel_credential_secret"));
+                })
+                .orElse(null);
+            default -> throw new IllegalArgumentException("Secret key non supportata.");
+        };
     }
 
     private void handleFile(MultipartFile file, UUID projectId, String category, String comment, UUID staffUserId) {
@@ -734,6 +829,14 @@ public class IntakeService {
         return list == null ? Collections.emptyList() : list;
     }
 
+    private boolean hasMarketingAds(IntakeForm form) {
+        return notBlank(form.getGoogleAdsUrl())
+            || notBlank(form.getMetaBusinessUrl())
+            || notBlank(form.getTiktokAdsUrl())
+            || notBlank(form.getLinkedinAdsUrl())
+            || notBlank(form.getOtherMarketingLinks());
+    }
+
     private boolean bool(Boolean value) {
         return Boolean.TRUE.equals(value);
     }
@@ -767,6 +870,47 @@ public class IntakeService {
 
     private String emptyToNull(String s) {
         return (s == null || s.isBlank()) ? null : s;
+    }
+
+    private String encryptSecret(String value) {
+        return secretCipherService.encryptNullable(value);
+    }
+
+    private String decryptSecret(Object value) {
+        if (!(value instanceof String s) || s.isBlank()) {
+            return null;
+        }
+        return secretCipherService.decryptNullable(s);
+    }
+
+    private void upgradeLegacyDomainSecrets(UUID projectId, Map<String, Object> row) {
+        String existingSecret = row.get("existing_credential_secret") instanceof String s ? s : null;
+        String newSecret = row.get("new_credential_secret") instanceof String s ? s : null;
+        boolean existingNeedsUpgrade = secretCipherService.hasStoredValue(existingSecret) && !secretCipherService.isEncrypted(existingSecret);
+        boolean newNeedsUpgrade = secretCipherService.hasStoredValue(newSecret) && !secretCipherService.isEncrypted(newSecret);
+        if (!existingNeedsUpgrade && !newNeedsUpgrade) {
+            return;
+        }
+        String encryptedExisting = existingNeedsUpgrade ? encryptSecret(existingSecret) : null;
+        String encryptedNew = newNeedsUpgrade ? encryptSecret(newSecret) : null;
+        repo.updateDomainSecrets(projectId, encryptedExisting, encryptedNew);
+        if (existingNeedsUpgrade) {
+            row.put("existing_credential_secret", encryptedExisting);
+        }
+        if (newNeedsUpgrade) {
+            row.put("new_credential_secret", encryptedNew);
+        }
+    }
+
+    private void upgradeLegacyStoreSecret(UUID projectId, Map<String, Object> row) {
+        String storedSecret = row.get("ecom_panel_credential_secret") instanceof String s ? s : null;
+        boolean needsUpgrade = secretCipherService.hasStoredValue(storedSecret) && !secretCipherService.isEncrypted(storedSecret);
+        if (!needsUpgrade) {
+            return;
+        }
+        String encrypted = encryptSecret(storedSecret);
+        repo.updateStorePanelSecret(projectId, encrypted);
+        row.put("ecom_panel_credential_secret", encrypted);
     }
 
     private Integer defaultInt(Integer value, int fallback) {

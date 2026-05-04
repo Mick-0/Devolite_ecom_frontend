@@ -983,11 +983,15 @@
   if (!sections.length || !links.length) return;
 
   const byId = new Map(links.map(l => [l.dataset.section, l]));
-  const confirmed = new Set(Array.isArray(window.__confirmedSections) ? window.__confirmedSections : []);
+  const confirmedSectionsAttr = document.body?.dataset?.confirmedSections || '';
+  const confirmed = new Set(
+    confirmedSectionsAttr
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+  );
   const bodyLockAttr = document.body?.dataset?.enforceSectionLock;
-  const enforceSectionLock = String(
-    bodyLockAttr !== undefined ? bodyLockAttr : window.__enforceSectionLock
-  ).toLowerCase() !== 'false';
+  const enforceSectionLock = String(bodyLockAttr === undefined ? 'true' : bodyLockAttr).toLowerCase() !== 'false';
   const form = document.querySelector('#intakeForm');
   const projectKindField = form?.querySelector('[name="projectKind"]');
   let progressEls = Array.from(document.querySelectorAll('.form-progress'));
@@ -1675,6 +1679,62 @@
 
   applyVariantsVisibility();
   applyPanelVisibility();
+
+  const projectId = form.querySelector('#projectId')?.value || '';
+  const secretRevealButtons = Array.from(form.querySelectorAll('[data-secret-reveal]'));
+  const setSecretStatus = (secretKey, message, isError = false) => {
+    const status = form.querySelector(`[data-secret-status="${secretKey}"]`);
+    if (!status) return;
+    status.textContent = message || '';
+    status.style.color = isError ? '#b54848' : 'var(--muted)';
+  };
+  const revealSecret = async (secretKey) => {
+    if (!projectId) {
+      setSecretStatus(secretKey, 'Salva prima la scheda per recuperare una credenziale.', true);
+      return;
+    }
+    const targetInput = form.querySelector(`[name="${secretKey}"]`);
+    if (!targetInput) return;
+    const csrf = readCsrf();
+    if (!csrf) {
+      setSecretStatus(secretKey, 'CSRF mancante. Ricarica la pagina.', true);
+      return;
+    }
+    setSecretStatus(secretKey, 'Recupero credenziale...');
+    try {
+      const response = await fetch('/intake/secret', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          [csrf.headerName]: csrf.token
+        },
+        body: JSON.stringify({ projectId, secretKey })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setSecretStatus(secretKey, payload.error || 'Errore durante il recupero.', true);
+        return;
+      }
+      if (!payload.found) {
+        setSecretStatus(secretKey, payload.message || 'Nessuna credenziale salvata.');
+        return;
+      }
+      targetInput.type = 'text';
+      targetInput.value = String(payload.value || '');
+      targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+      setSecretStatus(secretKey, 'Credenziale caricata nel campo.');
+    } catch {
+      setSecretStatus(secretKey, 'Errore durante il recupero.', true);
+    }
+  };
+  secretRevealButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const secretKey = button.dataset.secretReveal;
+      if (!secretKey) return;
+      revealSecret(secretKey);
+    });
+  });
 
   const suggestBtn = form.querySelector('[data-domain-suggest]');
   const suggestQ = form.querySelector('[data-domain-suggest-q]');

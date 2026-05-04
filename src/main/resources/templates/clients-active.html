@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="it" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Devolite | Clienti Attivi</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="/favicon_io/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon_io/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon_io/favicon-16x16.png" />
+  <link rel="icon" href="/favicon_io/favicon.ico" sizes="any" />
+  <link rel="manifest" href="/favicon_io/site.webmanifest" />
+  <link rel="stylesheet" th:href="@{/css/app.css(v=${@environment.getProperty('app.assets.version','1')})}" />
+</head>
+<body>
+  <div class="app" style="grid-template-columns: 1fr; max-width: 1100px;">
+    <main>
+      <div class="header">
+        <div>
+          <h2 style="margin:0;">Clienti Attivi</h2>
+          <div class="note">Sono visibili solo le schede al 100% di completamento.</div>
+        </div>
+        <div class="header-actions">
+          <a class="secondary" href="/dashboard">Dashboard</a>
+        </div>
+      </div>
+
+      <section class="card">
+        <form method="get" action="/clients/active">
+          <div class="modal-search" style="margin-bottom:12px;">
+            <input type="text" name="q" th:value="${query}" placeholder="Cerca per progetto, azienda, referente, email, P.IVA o città" />
+            <button type="submit" class="secondary">Filtra</button>
+          </div>
+          <div class="modal-filters">
+            <div class="field">
+              <label for="clientSortBy">Ordina per</label>
+              <select id="clientSortBy" name="sortBy">
+                <option value="updatedAt" th:selected="${sortBy == 'updatedAt'}">Ultimo aggiornamento</option>
+                <option value="projectName" th:selected="${sortBy == 'projectName'}">Nome progetto</option>
+                <option value="companyName" th:selected="${sortBy == 'companyName'}">Azienda</option>
+                <option value="projectStatus" th:selected="${sortBy == 'projectStatus'}">Stato</option>
+                <option value="projectKind" th:selected="${sortBy == 'projectKind'}">Tipo progetto</option>
+                <option value="city" th:selected="${sortBy == 'city'}">Città</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="clientSortDir">Direzione</label>
+              <select id="clientSortDir" name="sortDir">
+                <option value="desc" th:selected="${sortDir == 'desc'}">Decrescente</option>
+                <option value="asc" th:selected="${sortDir == 'asc'}">Crescente</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="clientLimit">Limite</label>
+              <select id="clientLimit" name="limit">
+                <option value="50" th:selected="${limit == 50}">50</option>
+                <option value="100" th:selected="${limit == 100}">100</option>
+                <option value="150" th:selected="${limit == 150}">150</option>
+                <option value="200" th:selected="${limit == 200}">200</option>
+              </select>
+            </div>
+          </div>
+        </form>
+
+        <div class="modal-list" style="margin-top:12px; max-height: calc(100vh - 320px);">
+          <div class="modal-empty" th:if="${#lists.isEmpty(clients)}">Nessun cliente completo trovato.</div>
+          <a th:each="client : ${clients}"
+             class="modal-item"
+             th:href="@{/intake(projectId=${client.projectId})}">
+            <div class="modal-item__title" th:text="${client.projectName}">Nome progetto</div>
+            <div class="modal-item__meta">
+              <span th:text="${client.companyName != null && !client.companyName.isBlank() ? 'Azienda: ' + client.companyName : 'Azienda: -'}">Azienda</span>
+              <span class="modal-tag" th:text="${client.progressPercent + '% (' + client.completedFields + '/' + client.totalFields + ')'}">100%</span>
+              <span th:text="${client.updatedAt != null ? #temporals.format(client.updatedAt, 'dd MMM yyyy') : ''}">01 mag 2026</span>
+            </div>
+            <div class="modal-item__detail">
+              <span th:text="${client.contactName != null && !client.contactName.isBlank() ? 'Contatto: ' + client.contactName : 'Contatto: -'}">Contatto</span>
+              <span th:text="${client.contactEmail != null && !client.contactEmail.isBlank() ? 'Email: ' + client.contactEmail : 'Email: -'}">Email</span>
+              <span th:text="${client.city != null && !client.city.isBlank() ? 'Città: ' + client.city : 'Città: -'}">Città</span>
+              <span th:text="${client.projectKind != null && !client.projectKind.isBlank() ? 'Tipo: ' + client.projectKind : 'Tipo: -'}">Tipo</span>
+            </div>
+          </a>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
